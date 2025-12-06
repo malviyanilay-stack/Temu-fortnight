@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fortnite Lite - Touch Edition</title>
+    <title>temu fortnight</title>
     <style>
         body {
             margin: 0;
@@ -67,6 +67,7 @@
             padding: 10px;
             border-radius: 8px;
             font-weight: bold;
+            line-height: 1.5;
         }
 
         #health-bar {
@@ -76,6 +77,7 @@
             height: 20px;
             background: #333;
             border: 2px solid white;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
         }
 
         #health-fill {
@@ -89,11 +91,32 @@
             top: 20px;
             right: 20px;
             text-align: right;
+            min-width: 150px;
         }
 
+        /* Permanent Title Display */
         #message-area {
             position: absolute;
-            top: 20%;
+            top: 5%; 
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white; 
+            font-size: 32px; 
+            font-weight: bold;
+            text-shadow: 3px 3px 0 #000;
+            text-align: center;
+            opacity: 1; /* Always visible */
+            transition: none; 
+            pointer-events: none;
+            background: none; 
+            width: 80%;
+            white-space: nowrap;
+        }
+        
+        /* Temporary Alerts for critical info (like ELIMINATED) */
+        #temp-message-area {
+            position: absolute;
+            top: 25%;
             left: 50%;
             transform: translate(-50%, -50%);
             color: #ffff00;
@@ -102,7 +125,11 @@
             text-align: center;
             opacity: 0;
             transition: opacity 0.5s;
+            background: transparent;
+            padding: 5px 15px;
+            border-radius: 8px;
         }
+
 
         /* Touch Controls */
         .touch-zone {
@@ -168,9 +195,11 @@
         #btn-build { background: rgba(50, 100, 255, 0.6); }
         #btn-jump { background: rgba(50, 255, 50, 0.6); }
 
+        /* General styles for buttons (since chat is removed) */
+        .game-btn { top: auto; right: auto; width: 70px; height: 70px; } 
+
         /* Mobile specific adjustments */
         @media (min-width: 1024px) {
-            /* Adjust for larger iPad screens if needed */
             .game-btn { width: 80px; height: 80px; }
             #btn-shoot { width: 100px; height: 100px; }
         }
@@ -192,35 +221,43 @@
         <div id="stats" class="hud-panel">
             <div>Enemies: <span id="enemy-count">0</span></div>
             <div>Elims: <span id="score-count">0</span></div>
-            <div>Mats: <span id="wood-count">∞</span></div>
+            <div>Mats: <span id="wood-count">50</span></div>
+            <div id="heat-display">Heat: <span id="heat-value">0</span>%</div>
         </div>
 
-        <div id="message-area">VICTORY ROYALE!</div>
+        <div id="message-area">temu fortnight</div>
+        <div id="temp-message-area"></div>
 
         <!-- Touch Controls -->
         <div id="left-zone" class="touch-zone"></div>
         <div id="right-zone" class="touch-zone"></div>
         <div id="left-knob" class="joystick-knob"></div>
         
+        <!-- Action Buttons -->
         <div id="action-buttons">
             <div id="btn-jump" class="game-btn">Jump</div>
-            <div id="btn-build" class="game-btn">Build</div>
+            <div id="btn-build" class="game-btn">Wall</div> 
             <div id="btn-shoot" class="game-btn">Fire</div>
         </div>
     </div>
 
 <script>
     // --- Game Configuration & State ---
+    const BUILD_COST = 1; // Wood cost per wall
+    const BUILD_THICKNESS = 0.2; // Thickness for wall
+    const BUILD_SIZE = 3; // Standard grid size (3x3 wall)
+    const PLAYER_HEIGHT = 1.8;
+    const PLAYER_WIDTH = 1.0;
+    const ENEMY_WIDTH = 1.0;
+
     const CONFIG = {
-        // --- MOVEMENT/SENSITIVITY ---
         playerSpeed: 0.15,    
         rotationSpeed: 0.03, 
         jumpForce: 0.4,
         gravity: 0.02,        
 
-        // --- ENEMY DIFFICULTY ---
         bulletSpeed: 0.7,     
-        enemySpeed: 0.1,      
+        enemySpeed: 0.05, 
         enemySpawnRate: 150,  
         
         enemyDamagePerTouch: 5,   
@@ -228,43 +265,84 @@
         enemyBulletSpeed: 0.4,    
         enemyBulletDamage: 10,    
         
-        // --- CAMERA CONFIG ---
         cameraDistance: 5,
         cameraHeight: 2.5,
-        cameraSmoothness: 0.1, // NEW: Factor for smooth camera movement (LERP)
+        cameraSmoothness: 0.1, 
+
+        // New Heat/Overheat Config
+        heatPerShot: 5, // REDUCED FROM 10 TO 5
+        coolRate: 0.5,
+        maxHeat: 100,
+        overheatResetThreshold: 50 // Heat must drop below 50% to reset overheat state
     };
 
     const STATE = {
         health: 100,
         score: 0,
+        wood: 50, // Initial wood count
+        heat: 0, // Current gun heat
+        isOverheated: false, // Gun is locked when true
         isGameOver: false,
         bullets: [],
         enemies: [],
-        builds: [],
+        builds: [], 
+        obstacles: [], 
         input: {
-            move: { x: 0, y: 0 }, // Left Stick
-            look: { x: 0, y: 0 }, // Right Stick (delta)
+            move: { x: 0, y: 0 }, 
+            look: { x: 0, y: 0 }, 
         },
-        // Camera/Player rotational state
-        playerYaw: 0, // Rotation around Y-axis (for player direction)
+        playerYaw: 0, 
     };
 
     // --- Three.js Setup ---
     let scene, camera, renderer;
-    let playerMesh; // The visible player body
-    let playerPosition = new THREE.Vector3(0, 0, 0); // Player's position vector
+    let playerMesh; 
+    let playerPosition = new THREE.Vector3(0, 0, 0); 
+    let oldPlayerPosition = new THREE.Vector3(0, 0, 0); 
     let playerVelocity = new THREE.Vector3();
     
-    // Smooth camera tracking variables
     let smoothCameraPosition = new THREE.Vector3();
     let smoothCameraTarget = new THREE.Vector3();
     
-    // Joystick logic variables
     let leftTouchId = null;
     let rightTouchId = null;
     let leftOrigin = { x: 0, y: 0 };
     let rightOrigin = { x: 0, y: 0 };
+    
+    // Global geometry/material re-use for obstacles
+    const treeTrunkGeo = new THREE.CylinderGeometry(0.5, 0.5, 2, 8);
+    const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+    const treeLeavesGeo = new THREE.ConeGeometry(2, 4, 8);
+    const treeLeavesMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
 
+    // --- Core Collision Check Function ---
+    /**
+     * Checks for collision between a proposed movement bounding box and obstacles.
+     * Note: This is mainly for movement (player/enemy), not build placement.
+     */
+    function checkCollisions(currentPos, velocity, width, height, obstacles) {
+        const proposedPos = currentPos.clone().add(velocity);
+        const objectBox = new THREE.Box3();
+        
+        // Center of the object is half the height up from the position (y-coordinate)
+        objectBox.setFromCenterAndSize(
+            proposedPos.clone().setY(proposedPos.y + height / 2), 
+            new THREE.Vector3(width, height, width) 
+        );
+
+        for (const obstacle of obstacles) {
+            if (!obstacle || obstacle.userData.solid === false) continue; 
+            
+            const obstacleBox = new THREE.Box3().setFromObject(obstacle);
+            
+            if (objectBox.intersectsBox(obstacleBox)) {
+                return true; 
+            }
+        }
+        return false;
+    }
+
+    // --- Three.js Init and World Setup ---
     function init() {
         // 1. Scene
         scene = new THREE.Scene();
@@ -311,10 +389,12 @@
         // 6. Listeners
         setupTouchControls();
         window.addEventListener('resize', onWindowResize, false);
-
-        // 7. Start Loop
+        
+        // 7. Start Loop and UI update
         animate();
-        showMessage("SMOOTH CAMERA ENABLED!", 2000);
+        document.getElementById('wood-count').innerText = STATE.wood;
+        document.getElementById('heat-value').innerText = STATE.heat.toFixed(0);
+        document.getElementById('temp-message-area').innerText = "";
     }
 
     function createEnvironment() {
@@ -326,25 +406,28 @@
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // Trees
-        const trunkGeo = new THREE.CylinderGeometry(0.5, 0.5, 2, 8);
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-        const leavesGeo = new THREE.ConeGeometry(2, 4, 8);
-        const leavesMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
-
+        // Trees (Obstacles)
         for(let i=0; i<30; i++) {
             const x = (Math.random() - 0.5) * 100;
             const z = (Math.random() - 0.5) * 100;
             
+            // Ensure trees are not too close to spawn (0, 0, 0)
             if(Math.abs(x) < 5 && Math.abs(z) < 5) continue;
 
-            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            // Trunk is the solid obstacle
+            const trunk = new THREE.Mesh(treeTrunkGeo, treeTrunkMat);
             trunk.position.set(x, 1, z);
             trunk.castShadow = true;
             trunk.receiveShadow = true;
+            
+            // Mark as solid obstacle
+            trunk.userData = { solid: true, type: 'tree' }; 
+            
             scene.add(trunk);
+            STATE.obstacles.push(trunk);
 
-            const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+            // Leaves (visuals only, not solid)
+            const leaves = new THREE.Mesh(treeLeavesGeo, treeLeavesMat);
             leaves.position.set(x, 4, z);
             leaves.castShadow = true;
             scene.add(leaves);
@@ -352,14 +435,12 @@
     }
 
     function createPlayer() {
-        // Player is only the visible mesh now
-        const geometry = new THREE.BoxGeometry(1, 1.8, 1);
-        const material = new THREE.MeshStandardMaterial({ color: 0x0000FF }); // Blue player
+        const geometry = new THREE.BoxGeometry(PLAYER_WIDTH, PLAYER_HEIGHT, PLAYER_WIDTH);
+        const material = new THREE.MeshStandardMaterial({ color: 0x0000FF }); 
         playerMesh = new THREE.Mesh(geometry, material);
-        playerMesh.position.y = 0.9;
+        playerMesh.position.y = PLAYER_HEIGHT / 2;
         playerMesh.castShadow = true;
         
-        // Start player at the center
         playerPosition.y = 0;
         scene.add(playerMesh);
     }
@@ -398,7 +479,6 @@
                     leftKnob.style.left = knobX + 'px';
                     leftKnob.style.top = knobY + 'px';
 
-                    // Update Game Input (-1 to 1)
                     STATE.input.move.x = (Math.cos(angle) * distance) / 50;
                     STATE.input.move.y = (Math.sin(angle) * distance) / 50;
                 }
@@ -434,7 +514,6 @@
                     const touch = e.changedTouches[i];
                     const deltaX = touch.clientX - lastRightX;
                     
-                    // Horizontal rotation sensitivity
                     STATE.input.look.x = deltaX * 0.01; 
                     
                     lastRightX = touch.clientX;
@@ -465,7 +544,7 @@
 
         document.getElementById('btn-build').addEventListener('touchstart', (e) => {
             e.preventDefault();
-            buildStructure();
+            placeWallStructure();
         }, {passive: false});
     }
 
@@ -474,7 +553,6 @@
         STATE.health -= amount;
         document.getElementById('health-fill').style.width = STATE.health + '%';
         
-        // Flash red for damage feedback
         playerMesh.material.color.setHex(0xFF6666);
         setTimeout(() => playerMesh.material.color.setHex(0x0000FF), 50);
 
@@ -483,34 +561,58 @@
         }
     }
 
+    // Temporary message display for critical/error feedback
+    function showTempMessage(text, duration) {
+        const msg = document.getElementById('temp-message-area');
+        msg.innerText = text;
+        msg.style.opacity = 1;
+        
+        // Flash the background red for error
+        msg.style.backgroundColor = text.includes('OVERHEATED') || text.includes('occupied') || text.includes('Wood') ? 'rgba(255, 0, 0, 0.4)' : 'rgba(0, 100, 255, 0.4)';
+        
+        setTimeout(() => {
+            msg.style.opacity = 0;
+            msg.style.backgroundColor = 'transparent';
+        }, duration);
+    }
+
     // --- Game Actions ---
     function jump() {
-        if (playerPosition.y <= 0.1) {
+        // Player can jump if standing on the ground (y=0) or very close to it
+        if (playerVelocity.y === 0 && playerPosition.y < 0.1) { 
             playerVelocity.y = CONFIG.jumpForce;
         }
     }
 
     function shoot() {
-        // Calculate the shooting direction based on the current camera/playerYaw
+        // 1. Heat Check
+        if (STATE.isOverheated) {
+            showTempMessage("OVERHEATED!", 1000);
+            return;
+        }
+
+        // 2. Apply Heat
+        STATE.heat += CONFIG.heatPerShot;
+        if (STATE.heat >= CONFIG.maxHeat) {
+            STATE.heat = CONFIG.maxHeat;
+            STATE.isOverheated = true;
+            showTempMessage("GUN OVERHEATED!", 1500);
+        }
+
         const direction = new THREE.Vector3(0, 0, -1);
         direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), STATE.playerYaw);
         
-        // Create player bullet
         const geometry = new THREE.SphereGeometry(0.2, 8, 8);
-        const material = new THREE.MeshBasicMaterial({ color: 0xFFFF00 }); // Yellow bullet
+        const material = new THREE.MeshBasicMaterial({ color: 0xFFFF00 }); 
         const bullet = new THREE.Mesh(geometry, material);
         
-        // Start at player position (slightly raised and forward)
         bullet.position.copy(playerPosition);
-        bullet.position.y += 1.5; // Eye level
-        
-        // Offset slightly forward to not clip player
+        bullet.position.y += PLAYER_HEIGHT * 0.8; // Shoot from eye level
         bullet.position.add(direction.clone().multiplyScalar(1));
 
-        // Add velocity and type property to mesh
         bullet.userData = { 
             velocity: direction.multiplyScalar(CONFIG.bulletSpeed),
-            life: 60, // frames
+            life: 60, 
             type: 'player'
         };
 
@@ -519,22 +621,18 @@
     }
 
     function enemyShoot(enemy) {
-        // Calculate the shooting direction from enemy to player
         const direction = new THREE.Vector3().subVectors(playerPosition, enemy.position).normalize();
         
-        // Create enemy bullet
         const geometry = new THREE.SphereGeometry(0.2, 8, 8);
-        const material = new THREE.MeshBasicMaterial({ color: 0x9900FF }); // Purple bullet
+        const material = new THREE.MeshBasicMaterial({ color: 0x9900FF }); 
         const bullet = new THREE.Mesh(geometry, material);
         
-        // Start at enemy's position (slightly raised)
         bullet.position.copy(enemy.position);
-        bullet.position.y += 1;
+        bullet.position.y += ENEMY_WIDTH; // Shoot from enemy chest level
         
-        // Add velocity and type property to mesh
         bullet.userData = { 
             velocity: direction.multiplyScalar(CONFIG.enemyBulletSpeed),
-            life: 90, // Longer life since travel distance is greater
+            life: 90, 
             type: 'enemy'
         };
 
@@ -542,57 +640,120 @@
         STATE.bullets.push(bullet);
     }
 
-    function buildStructure() {
-        // This is simplified as we don't track resources dynamically
-        if(document.getElementById('wood-count').innerText === '0') return;
+    function placeWallStructure() {
+        // 1. Resource Check
+        if (STATE.wood < BUILD_COST) {
+            showTempMessage("Not enough Wood!", 1000);
+            return;
+        }
 
-        // Calculate the building direction based on the current camera/playerYaw
+        const typeToPlace = 'Wall';
+
         const direction = new THREE.Vector3(0, 0, -1);
         direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), STATE.playerYaw);
 
-        // Build a ramp in front of player
-        const geometry = new THREE.BoxGeometry(3, 0.2, 3);
-        const material = new THREE.MeshStandardMaterial({ 
-            color: 0xA0522D, // Wood brown
-            transparent: false
-        });
-        const ramp = new THREE.Mesh(geometry, material);
-
-        // Position in front of player
-        const buildPos = playerPosition.clone().add(direction.multiplyScalar(3));
+        const baseHeight = 0; 
         
-        // Snap to grid-ish
-        buildPos.x = Math.round(buildPos.x / 2) * 2;
-        buildPos.z = Math.round(buildPos.z / 2) * 2;
-        buildPos.y = 1; // Half height
+        // Calculate the central position (X and Z snapped) in front of the player
+        const buildPos = playerPosition.clone().add(direction.multiplyScalar(BUILD_SIZE));
+        const snappedX = Math.round(buildPos.x / BUILD_SIZE) * BUILD_SIZE;
+        const snappedZ = Math.round(buildPos.z / BUILD_SIZE) * BUILD_SIZE;
+        
+        // 2. Overlap Check
+        const isOverlapping = STATE.builds.some(build => {
+            // Check if the existing build is in the exact same snapped location at the same height (Y=1.5 center)
+            return build.position.x === snappedX && build.position.z === snappedZ && build.position.y === 1.5;
+        });
 
-        ramp.position.copy(buildPos);
-        ramp.rotation.x = -Math.PI / 4; // 45 degree ramp
-        // Rotate to match player yaw
-        ramp.rotation.y = STATE.playerYaw; 
+        if (isOverlapping) {
+            showTempMessage("Space is already occupied!", 1000);
+            return;
+        }
 
-        scene.add(ramp);
-        STATE.builds.push(ramp);
+        // If checks pass, deduct wood and update UI
+        STATE.wood -= BUILD_COST;
+        document.getElementById('wood-count').innerText = STATE.wood;
+
+        // --- Build Creation ---
+        buildPos.x = snappedX;
+        buildPos.z = snappedZ;
+        
+        // Define material
+        const buildMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0xA0522D, // Wood color
+            transparent: true,
+            opacity: 0.9
+        });
+
+
+        // WALL: 3x3x0.2 Box (3 units wide, 3 units high, 0.2 units thick)
+        const geometry = new THREE.BoxGeometry(BUILD_SIZE, BUILD_SIZE, BUILD_THICKNESS); // Z is thickness
+        
+        // Center Y position: Base Height (0) + (Wall Height / 2) (1.5)
+        buildPos.y = baseHeight + (BUILD_SIZE / 2); 
+        
+        const mesh = new THREE.Mesh(geometry, buildMaterial);
+        mesh.position.copy(buildPos);
+        
+        // Rotate the wall so its thickness (Z axis) faces the player
+        mesh.rotation.y = STATE.playerYaw; 
+
+        mesh.receiveShadow = true;
+        mesh.castShadow = true;
+
+        mesh.userData = {
+            type: typeToPlace,
+            health: 3,
+            maxHealth: 3,
+            solid: true 
+        };
+
+        scene.add(mesh);
+        STATE.builds.push(mesh);
+        STATE.obstacles.push(mesh); // Add to general collision list
+        
+        document.getElementById('btn-build').innerText = 'WALL';
+    }
+    
+    // --- Collision and Damage Logic for Builds ---
+    function handleBuildHit(build, bulletIndex) {
+        build.userData.health--;
+        
+        // Remove the bullet
+        scene.remove(STATE.bullets[bulletIndex]);
+        STATE.bullets.splice(bulletIndex, 1);
+        
+        // Visual Damage Feedback: Darken color based on remaining health
+        const damageRatio = build.userData.health / build.userData.maxHealth;
+        const baseColor = new THREE.Color(0xA0522D); 
+        const damagedColor = new THREE.Color(0x301808); 
+        const currentColor = baseColor.clone().lerp(damagedColor, 1 - damageRatio);
+        build.material.color.set(currentColor);
+        
+        if (build.userData.health <= 0) {
+            scene.remove(build);
+            return true; 
+        }
+        return false; 
     }
 
     function spawnEnemy() {
         if (STATE.isGameOver) return;
         
-        const geometry = new THREE.BoxGeometry(1, 1.8, 1);
+        const geometry = new THREE.BoxGeometry(ENEMY_WIDTH, PLAYER_HEIGHT, ENEMY_WIDTH);
         const material = new THREE.MeshStandardMaterial({ color: 0xFF0000 });
         const enemy = new THREE.Mesh(geometry, material);
 
-        // Spawn somewhere far away
         const angle = Math.random() * Math.PI * 2;
         const radius = 30 + Math.random() * 20;
         enemy.position.set(
             playerPosition.x + Math.cos(angle) * radius,
-            1, // y
+            1, 
             playerPosition.z + Math.sin(angle) * radius
         );
         
         enemy.castShadow = true;
-        enemy.userData = { health: 3 };
+        enemy.userData = { health: 3, type: 'enemy', solid: true }; 
         
         scene.add(enemy);
         STATE.enemies.push(enemy);
@@ -613,38 +774,77 @@
             spawnEnemy();
         }
 
-        // 1. Camera Rotation (Right Stick)
-        // Update the global player Yaw based on touch input
-        STATE.playerYaw -= STATE.input.look.x * 5; 
-        STATE.input.look.x = 0; // Reset look delta
-
-        // 2. Player Movement (Left Stick)
-        if (STATE.input.move.x !== 0 || STATE.input.move.y !== 0) {
+        // 1. Gun Overheat/Cooldown Logic
+        if (STATE.heat > 0) {
+            STATE.heat -= CONFIG.coolRate;
+            if (STATE.heat < 0) STATE.heat = 0;
             
-            // Calculate movement direction relative to the Camera's current facing (STATE.playerYaw)
+            // Check if cooling restored functionality
+            if (STATE.isOverheated && STATE.heat < CONFIG.overheatResetThreshold) { 
+                STATE.isOverheated = false;
+            }
+            
+            // Update UI
+            document.getElementById('heat-value').innerText = STATE.heat.toFixed(0);
+            
+            // Visual indicator for overheating 
+            if (STATE.isOverheated) {
+                document.getElementById('heat-display').style.color = 'red';
+                document.getElementById('btn-shoot').style.backgroundColor = 'rgba(255, 50, 50, 0.2)'; 
+            } else if (STATE.heat > (CONFIG.maxHeat * 0.7)) {
+                document.getElementById('heat-display').style.color = 'orange';
+                document.getElementById('btn-shoot').style.backgroundColor = 'rgba(255, 50, 50, 0.8)'; 
+            } else {
+                document.getElementById('heat-display').style.color = 'white';
+                document.getElementById('btn-shoot').style.backgroundColor = 'rgba(255, 50, 50, 0.6)'; 
+            }
+        }
+
+
+        // 2. Store previous player position (for predictive grounding - mostly ignored now)
+        oldPlayerPosition.copy(playerPosition); 
+
+        // 3. Camera Rotation (Right Stick)
+        STATE.playerYaw -= STATE.input.look.x * 5; 
+        STATE.input.look.x = 0; 
+
+        // 4. Player Horizontal Movement (Input Handling and Collision)
+        if (STATE.input.move.x !== 0 || STATE.input.move.y !== 0) {
             const forwardVector = new THREE.Vector3(0, 0, -1);
-            forwardVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), STATE.playerYaw); // Apply current camera rotation
+            forwardVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), STATE.playerYaw); 
             
             const rightVector = new THREE.Vector3(1, 0, 0);
-            rightVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), STATE.playerYaw); // Apply current camera rotation
+            rightVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), STATE.playerYaw); 
             
-            // Calculate total movement vector
-            // Joystick Y is typically inverted (positive Y on screen is down)
-            const moveVec = forwardVector.clone().multiplyScalar(-STATE.input.move.y).add(rightVector.clone().multiplyScalar(STATE.input.move.x));
-            moveVec.normalize().multiplyScalar(CONFIG.playerSpeed);
+            const desiredVelocity = forwardVector.clone().multiplyScalar(-STATE.input.move.y).add(rightVector.clone().multiplyScalar(STATE.input.move.x));
+            desiredVelocity.normalize().multiplyScalar(CONFIG.playerSpeed);
             
-            playerPosition.add(moveVec);
+            // Player collision check (X and Z axis separately for sliding)
+            const obstaclesExcludingSelf = STATE.obstacles.concat(STATE.enemies).filter(o => o !== playerMesh);
 
-            // Rotate the visual player mesh to face the direction of movement (if moving)
-            const angle = Math.atan2(moveVec.x, moveVec.z);
+            // Check X-axis movement
+            if (!checkCollisions(playerPosition, new THREE.Vector3(desiredVelocity.x, 0, 0), PLAYER_WIDTH, PLAYER_HEIGHT, obstaclesExcludingSelf)) {
+                playerPosition.x += desiredVelocity.x;
+            } else {
+                desiredVelocity.x = 0;
+            }
+
+            // Check Z-axis movement
+            if (!checkCollisions(playerPosition, new THREE.Vector3(0, 0, desiredVelocity.z), PLAYER_WIDTH, PLAYER_HEIGHT, obstaclesExcludingSelf)) {
+                playerPosition.z += desiredVelocity.z;
+            } else {
+                desiredVelocity.z = 0;
+            }
+
+            const angle = Math.atan2(desiredVelocity.x, desiredVelocity.z);
             playerMesh.rotation.y = angle; 
         }
 
-        // 3. Apply Gravity & Grounding
+        // 5. Apply Gravity & Vertical Movement
         playerVelocity.y -= CONFIG.gravity;
         playerPosition.y += playerVelocity.y;
 
-        // Simple Ground collision
+        // 6. Simple Ground collision
         if (playerPosition.y < 0) {
             playerPosition.y = 0;
             playerVelocity.y = 0;
@@ -652,15 +852,12 @@
 
         // Update the visual mesh position
         playerMesh.position.copy(playerPosition);
-        playerMesh.position.y += 0.9; // Adjust for half height
+        playerMesh.position.y += PLAYER_HEIGHT / 2; 
 
-        // 4. Update Camera Position (Third Person Orbit with SMOOTHING)
-        
-        // Calculate DESIRED look target (Player's head height)
+        // 7. Update Camera Position
         const desiredTargetPos = playerPosition.clone();
         const desiredLookTarget = desiredTargetPos.clone().setY(desiredTargetPos.y + 1.5);
         
-        // Calculate DESIRED camera position offset based on playerYaw
         const offset = new THREE.Vector3(0, 0, CONFIG.cameraDistance);
         offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), STATE.playerYaw);
         
@@ -670,16 +867,14 @@
             desiredTargetPos.z + offset.z
         );
 
-        // Apply smoothing (Linear Interpolation - LERP)
         smoothCameraPosition.lerp(desiredCamPos, CONFIG.cameraSmoothness);
         smoothCameraTarget.lerp(desiredLookTarget, CONFIG.cameraSmoothness);
 
-        // Set camera position and look at the smoothed target
         camera.position.copy(smoothCameraPosition);
         camera.lookAt(smoothCameraTarget);
 
 
-        // 5. Update Bullets (Physics & Collision)
+        // 8. Update Bullets (Physics & Collision)
         for (let i = STATE.bullets.length - 1; i >= 0; i--) {
             const b = STATE.bullets[i];
             b.position.add(b.userData.velocity);
@@ -687,17 +882,33 @@
             
             let hit = false;
             
+            // Bullet vs Build Collision 
+            for (let j = STATE.builds.length - 1; j >= 0; j--) {
+                const build = STATE.builds[j];
+                // Check if bullet is near the build's center
+                if (b.position.distanceTo(build.position) < 2.5) { 
+                    
+                    const buildBox = new THREE.Box3().setFromObject(build);
+                    
+                    if (buildBox.containsPoint(b.position)) {
+                        hit = handleBuildHit(build, i); 
+                        if(hit) {
+                            break; 
+                        }
+                    }
+                }
+            }
+            if (hit) continue; 
+
             if (b.userData.type === 'player') {
                 // Player bullet collision with Enemies
                 for (let j = STATE.enemies.length - 1; j >= 0; j--) {
                     const e = STATE.enemies[j];
-                    // Check collision distance
                     if (b.position.distanceTo(e.position) < 1.5) {
                         scene.remove(b);
                         STATE.bullets.splice(i, 1);
                         hit = true;
                         
-                        // Damage Enemy
                         e.userData.health--;
                         if(e.userData.health <= 0) {
                             scene.remove(e);
@@ -706,7 +917,6 @@
                             document.getElementById('score-count').innerText = STATE.score;
                             document.getElementById('enemy-count').innerText = STATE.enemies.length;
                         } else {
-                            // Flash red for damage feedback
                             e.material.color.setHex(0xFF6666);
                             setTimeout(() => e.material.color.setHex(0xFF0000), 100);
                         }
@@ -714,9 +924,16 @@
                     }
                 }
             } else if (b.userData.type === 'enemy') {
-                // Enemy bullet collision with Player
-                // A simplified collision check based on distance to player center
-                if (b.position.distanceTo(playerPosition) < 1.0) {
+                // Enemy bullet collision with Player (Fixed for better bounding box check)
+                
+                // Get distance in XZ plane
+                const distXZ = Math.hypot(b.position.x - playerPosition.x, b.position.z - playerPosition.z);
+
+                // Check if bullet is close horizontally AND within player height vertically
+                if (distXZ < PLAYER_WIDTH / 2 && 
+                    b.position.y >= playerPosition.y && 
+                    b.position.y <= playerPosition.y + PLAYER_HEIGHT) 
+                {
                     scene.remove(b);
                     STATE.bullets.splice(i, 1);
                     hit = true;
@@ -732,21 +949,50 @@
                 STATE.bullets.splice(i, 1);
             }
         }
+        
+        // 9. Cleanup Destroyed Builds 
+        const initialBuildsLength = STATE.builds.length;
+        STATE.builds = STATE.builds.filter(build => build.userData.health > 0);
+        if (STATE.builds.length !== initialBuildsLength) {
+            // Re-filter obstacles if a build was destroyed
+            STATE.obstacles = STATE.obstacles.filter(o => o.userData.health === undefined || o.userData.health > 0);
+        }
 
-        // 6. Update Enemies (AI)
+
+        // 10. Update Enemies (AI) & Collision
+        const playerAndObstacles = STATE.obstacles.concat(playerMesh); 
+
         for (const enemy of STATE.enemies) {
+            const localObstacles = playerAndObstacles.filter(o => o !== enemy);
+
             const dir = new THREE.Vector3().subVectors(playerPosition, enemy.position);
             dir.y = 0;
             dir.normalize();
-            enemy.position.add(dir.multiplyScalar(CONFIG.enemySpeed));
-            enemy.lookAt(playerPosition.x, enemy.position.y, playerPosition.z); // Only rotate yaw
-
-            // Enemy Shooting Logic
-            if (frameCount % CONFIG.enemyFireRate === 0) {
-                enemyShoot(enemy);
+            
+            const desiredVelocity = dir.clone().multiplyScalar(CONFIG.enemySpeed);
+            
+            // Check collision for enemy movement
+            
+            // Check X-axis movement
+            if (!checkCollisions(enemy.position, new THREE.Vector3(desiredVelocity.x, 0, 0), ENEMY_WIDTH, PLAYER_HEIGHT, localObstacles)) {
+                enemy.position.x += desiredVelocity.x;
             }
 
-            // Hit Player (Melee damage)?
+            // Check Z-axis movement
+            if (!checkCollisions(enemy.position, new THREE.Vector3(0, 0, desiredVelocity.z), ENEMY_WIDTH, PLAYER_HEIGHT, localObstacles)) {
+                enemy.position.z += desiredVelocity.z;
+            }
+
+            enemy.lookAt(playerPosition.x, enemy.position.y, playerPosition.z); 
+
+            if (frameCount % CONFIG.enemyFireRate === 0) {
+                // Check if enemy is close enough to shoot
+                if (enemy.position.distanceTo(playerPosition) < 40) {
+                    enemyShoot(enemy);
+                }
+            }
+
+            // Hit Player (Melee damage)
             if (enemy.position.distanceTo(playerPosition) < 1.0) {
                 takeDamage(CONFIG.enemyDamagePerTouch);
             }
@@ -757,19 +1003,12 @@
 
     function gameOver() {
         STATE.isGameOver = true;
-        const msg = document.getElementById('message-area');
+        const msg = document.getElementById('temp-message-area');
         msg.innerText = "ELIMINATED";
         msg.style.color = "red";
         msg.style.opacity = 1;
-    }
-
-    function showMessage(text, duration) {
-        const msg = document.getElementById('message-area');
-        msg.innerText = text;
-        msg.style.opacity = 1;
-        setTimeout(() => {
-            msg.style.opacity = 0;
-        }, duration);
+        msg.style.top = '50%';
+        msg.style.fontSize = '48px';
     }
 
     function onWindowResize() {
