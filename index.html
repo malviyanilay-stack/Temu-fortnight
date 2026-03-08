@@ -22,7 +22,6 @@
         #stats-ui { top: 20px; right: 20px; text-align: right; font-size: 14px; line-height: 1.4; }
         #title-card { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font-size: 22px; color: white; text-shadow: 2px 2px #000; }
 
-        /* Zones for simultaneous control */
         .touch-zone { position: absolute; bottom: 0; height: 100vh; width: 50vw; pointer-events: auto; }
         #left-zone { left: 0; }
         #right-zone { right: 0; }
@@ -57,7 +56,8 @@
     </div>
 
 <script>
-    const CONFIG = { speed: 0.18, jump: 0.45, gravity: 0.02, bulletSpeed: 1.6, spawnRate: 0.012, enemyFireRate: 85, hitBox: 2.2 };
+    // CONFIG UPDATED: Slower speed (0.12) and Bullet Speed (0.6)
+    const CONFIG = { speed: 0.12, jump: 0.45, gravity: 0.02, bulletSpeed: 0.6, spawnRate: 0.012, enemyFireRate: 85, hitBox: 2.2 };
     let STATE = { hp: 100, score: 0, yaw: 0, targetYaw: 0, move: {x:0, y:0}, pBullets: [], eBullets: [], enemies: [] };
     
     let scene, camera, renderer, player, mapCtx, mapCanvas;
@@ -108,11 +108,9 @@
 
         player = createHumanoid(0x0044ff); scene.add(player);
 
-        // INDEPENDENT MULTI-TOUCH CONTROLS
         let lId = null, rId = null, lO = {x:0, y:0}, lastRx = 0;
-        const lz = document.getElementById('left-zone'), rz = document.getElementById('right-zone');
         
-        const handleStart = (e) => {
+        window.addEventListener('touchstart', e => {
             for (let t of e.changedTouches) {
                 if (t.clientX < window.innerWidth/2 && lId === null) {
                     lId = t.identifier; lO = {x:t.clientX, y:t.clientY};
@@ -123,9 +121,9 @@
                 }
             }
             e.preventDefault();
-        };
+        }, {passive: false});
 
-        const handleMove = (e) => {
+        window.addEventListener('touchmove', e => {
             for (let t of e.touches) {
                 if (t.identifier === lId) {
                     const dx = t.clientX - lO.x, dy = t.clientY - lO.y;
@@ -139,18 +137,14 @@
                     lastRx = t.clientX;
                 }
             }
-        };
+        }, {passive: false});
 
-        const handleEnd = (e) => {
+        window.addEventListener('touchend', e => {
             for (let t of e.changedTouches) {
                 if (t.identifier === lId) { lId = null; STATE.move = {x:0, y:0}; joyBase.style.display = 'none'; }
                 if (t.identifier === rId) { rId = null; }
             }
-        };
-
-        window.addEventListener('touchstart', handleStart, {passive: false});
-        window.addEventListener('touchmove', handleMove, {passive: false});
-        window.addEventListener('touchend', handleEnd);
+        });
 
         document.getElementById('jump-btn').addEventListener('touchstart', e => { if(player.position.y < 0.1) player.userData.velY = CONFIG.jump; e.preventDefault(); });
         document.getElementById('shoot-btn').addEventListener('touchstart', e => { fire(true); e.preventDefault(); });
@@ -177,28 +171,22 @@
     function updateHealthUI() {
         const fill = document.getElementById('hp-fill');
         fill.style.width = STATE.hp + '%';
-        // Color transition: Green (120) to Red (0)
         const hue = (STATE.hp / 100) * 120;
         fill.style.backgroundColor = `hsl(${hue}, 100%, 50%)`;
     }
 
     function resetGame() {
-        STATE.hp = 100;
-        STATE.score = 0;
+        STATE.hp = 100; STATE.score = 0;
         player.position.set(0, 0, 0);
-        STATE.enemies.forEach(e => scene.remove(e));
-        STATE.enemies = [];
-        STATE.pBullets.forEach(b => scene.remove(b));
-        STATE.pBullets = [];
-        STATE.eBullets.forEach(b => scene.remove(b));
-        STATE.eBullets = [];
+        STATE.enemies.forEach(e => scene.remove(e)); STATE.enemies = [];
+        STATE.pBullets.forEach(b => scene.remove(b)); STATE.pBullets = [];
+        STATE.eBullets.forEach(b => scene.remove(b)); STATE.eBullets = [];
         updateHealthUI();
     }
 
     function animate() {
         requestAnimationFrame(animate);
         const time = Date.now() * 0.001;
-
         STATE.yaw += (STATE.targetYaw - STATE.yaw) * 0.15;
         player.rotation.y = STATE.yaw; 
 
@@ -216,9 +204,9 @@
 
         [player, ...STATE.enemies].forEach(m => {
             const p = m.userData.parts;
-            const isMoving = (m === player) ? moveV.length() > 0.02 : true;
+            const isMoving = (m === player) ? moveV.length() > 0.01 : true;
             if(isMoving && m.position.y < 0.1) {
-                const s = Math.sin(time * 12) * 0.5;
+                const s = Math.sin(time * 10) * 0.4;
                 p.lL.rotation.x = s; p.rL.rotation.x = -s;
                 p.lA.rotation.x = -s; p.rA.rotation.x = s;
             } else { p.lL.rotation.x = p.rL.rotation.x = p.lA.rotation.x = p.rA.rotation.x = 0; }
@@ -254,7 +242,7 @@
         STATE.enemies.forEach(e => {
             const dir = new THREE.Vector3().subVectors(player.position, e.position).normalize();
             e.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI;
-            e.position.x += dir.x * 0.08; e.position.z += dir.z * 0.08; e.position.y = 0; 
+            e.position.x += dir.x * 0.06; e.position.z += dir.z * 0.06; e.position.y = 0; 
             e.userData.fireTimer++;
             if(e.userData.fireTimer > CONFIG.enemyFireRate) { fire(false, e); e.userData.fireTimer = 0; }
         });
