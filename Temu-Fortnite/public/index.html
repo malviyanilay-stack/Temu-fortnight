@@ -3,201 +3,190 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Temu Fortnite - Online</title>
+    <title>Temu Fortnite - Multi-Stable</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #B0E2FF; font-family: 'Arial Black', sans-serif; touch-action: none; user-select: none; }
-        #game-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; }
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
-        
-        .hud { position: absolute; background: rgba(0, 0, 0, 0.8); color: white; padding: 12px; border-radius: 8px; border: 2px solid #ffaa00; font-size: 14px; }
-        #mana-ui { top: 20px; left: 20px; width: 120px; }
-        #mana-bar { width: 100%; height: 10px; background: #333; margin-top: 5px; border-radius: 5px; overflow: hidden; }
-        #mana-fill { width: 100%; height: 100%; background: #0077ff; transition: width 0.2s; }
-        #stats-ui { top: 20px; right: 20px; text-align: right; }
-        
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; transform: translate(-50%, -50%); border: 2px solid white; border-radius: 50%; }
-        
-        #action-btns { position: absolute; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 15px; pointer-events: auto; }
-        .btn { width: 80px; height: 80px; border-radius: 50%; border: 3px solid white; background: rgba(0,0,0,0.5); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; }
-        #shoot-btn { background: rgba(255, 0, 0, 0.7); width: 100px; height: 100px; font-size: 18px; }
-        
-        #joystick-base { position: absolute; width: 100px; height: 100px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; display: none; pointer-events: none; }
-        #joystick-knob { position: absolute; width: 50px; height: 50px; background: white; border-radius: 50%; top: 25px; left: 25px; }
+        body { margin: 0; overflow: hidden; background-color: #1a1a2e; font-family: sans-serif; touch-action: none; }
+        #ui { position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        .hud { position: absolute; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 5px; border: 1px solid #0ff; pointer-events: none; }
+        #mana-ui { top: 20px; left: 20px; width: 150px; }
+        #mana-bar { width: 100%; height: 10px; background: #222; margin-top: 5px; }
+        #mana-fill { height: 100%; background: #0088ff; width: 100%; }
+        #stats { top: 20px; right: 20px; text-align: right; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid #0ff; border-radius: 50%; transform: translate(-50%, -50%); }
+        #joystick-ui { position: absolute; width: 100px; height: 100px; background: rgba(255,255,255,0.1); border-radius: 50%; display: none; }
+        #joystick-knob { position: absolute; width: 40px; height: 40px; background: #0ff; border-radius: 50%; left: 30px; top: 30px; }
+        #btns { position: absolute; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+        .btn { width: 70px; height: 70px; background: rgba(0,0,0,0.6); color: white; border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        #fire-btn { background: #ff4444; width: 90px; height: 90px; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <div id="game-container"></div>
-    <div id="ui-layer">
+    <div id="ui">
         <div id="mana-ui" class="hud">MANA<div id="mana-bar"><div id="mana-fill"></div></div></div>
-        <div id="stats-ui" class="hud">TEAM ELIMS: <span id="score">0</span><br>HOSTILES: <span id="count">0</span></div>
+        <div id="stats" class="hud">ELIMS: <span id="score">0</span><br>ENEMIES: <span id="ecount">0</span></div>
         <div id="crosshair"></div>
-        <div id="joystick-base"><div id="joystick-knob"></div></div>
-        <div id="action-btns">
+        <div id="joystick-ui"><div id="joystick-knob"></div></div>
+        <div id="btns">
             <div id="scope-btn" class="btn">SCOPE</div>
             <div id="jump-btn" class="btn">JUMP</div>
-            <div id="shoot-btn" class="btn">FIRE</div>
+            <div id="fire-btn" class="btn">FIRE</div>
         </div>
     </div>
+    <div id="container"></div>
 
 <script>
     const socket = io();
     let scene, camera, renderer, player, clock;
-    let otherPlayers = {};
-    let enemies = {};
-    
-    const CONFIG = { speed: 0.15, jump: 0.5, gravity: 0.02, bulletSpeed: 0.8, maxMana: 100 };
-    let STATE = { mana: 100, score: 0, yaw: 0, targetYaw: 0, move: {x:0, y:0}, pBullets: [], isScoping: false };
+    let others = {}, enemies = {}, bullets = [];
+    const conf = { speed: 0.18, jump: 0.45, gravity: 0.02, bulletSpeed: 0.9 };
+    let state = { mana: 100, score: 0, yaw: 0, targetYaw: 0, move: {x:0, y:0}, isScoping: false };
 
-    function createHumanoid(color) {
-        const group = new THREE.Group();
-        const mat = new THREE.MeshStandardMaterial({ color });
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.9, 0.4), mat); body.position.y = 1.15; group.add(body);
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshStandardMaterial({color: 0xffdbac})); head.position.y = 1.8; group.add(head);
-        const limb = new THREE.BoxGeometry(0.2, 0.7, 0.2);
-        const rA = new THREE.Mesh(limb, mat); rA.position.set(0.45, 1.15, 0); group.add(rA);
-        const lL = new THREE.Mesh(limb, mat); lL.position.set(-0.2, 0.35, 0); group.add(lL);
-        const rL = new THREE.Mesh(limb, mat); rL.position.set(0.2, 0.35, 0); group.add(rL);
-        group.userData = { velY: 0, hp: 3 };
-        return group;
+    function createModel(color) {
+        const g = new THREE.Group();
+        const m = new THREE.MeshStandardMaterial({ color });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1, 0.5), m); body.position.y = 1.2; g.add(body);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({color: 0xffdbac})); head.position.y = 1.9; g.add(head);
+        g.userData = { velY: 0 };
+        return g;
     }
 
     function init() {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 3000);
         
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        document.getElementById('game-container').appendChild(renderer.domElement);
+        document.getElementById('container').appendChild(renderer.domElement);
 
-        // Lights
-        const ambient = new THREE.AmbientLight(0xffffff, 1.0); scene.add(ambient);
-        const sun = new THREE.DirectionalLight(0xffffff, 0.8); sun.position.set(5, 10, 5); scene.add(sun);
+        scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+        const sun = new THREE.DirectionalLight(0xffffff, 0.8); sun.position.set(10, 20, 10); scene.add(sun);
 
-        // Ground & Grid
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.MeshStandardMaterial({color: 0x348C31}));
-        ground.rotation.x = -Math.PI / 2; scene.add(ground);
-        const grid = new THREE.GridHelper(2000, 80, 0xffffff, 0x444444); scene.add(grid);
+        // GROUND
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshStandardMaterial({color: 0x228B22}));
+        ground.rotation.x = -Math.PI/2; scene.add(ground);
+        scene.add(new THREE.GridHelper(3000, 100, 0xffffff, 0x004400));
 
-        // Player (Eugene/Blue)
-        player = createHumanoid(0x0055ff);
-        player.position.set(0, 0, 0);
-        scene.add(player);
+        // SPAWN POINT (To see the map)
+        const spawnPoint = new THREE.Mesh(new THREE.CircleGeometry(5, 32), new THREE.MeshBasicMaterial({color: 0xffff00}));
+        spawnPoint.rotation.x = -Math.PI/2; spawnPoint.position.y = 0.01; scene.add(spawnPoint);
 
-        // Socket Events
-        socket.on('currentPlayers', (ps) => { Object.keys(ps).forEach(id => { if(id !== socket.id) addTeammate(id, ps[id]) })});
+        player = createModel(0x0000ff); scene.add(player);
+
+        socket.on('currentPlayers', (ps) => Object.keys(ps).forEach(id => { if(id !== socket.id) addTeammate(id, ps[id]) }));
         socket.on('newPlayer', (d) => addTeammate(d.id, d.playerInfo));
-        socket.on('playerMoved', (d) => { if(otherPlayers[d.id]) { otherPlayers[d.id].position.set(d.playerInfo.x, d.playerInfo.y, d.playerInfo.z); otherPlayers[d.id].rotation.y = d.playerInfo.yaw; }});
-        socket.on('playerDisconnected', (id) => { if(otherPlayers[id]) { scene.remove(otherPlayers[id]); delete otherPlayers[id]; }});
+        socket.on('playerMoved', (d) => { if(others[d.id]) { others[d.id].position.set(d.x, d.y, d.z); others[d.id].rotation.y = d.yaw; }});
+        socket.on('playerDisconnected', (id) => { if(others[id]) { scene.remove(others[id]); delete others[id]; }});
         
-        socket.on('spawnEnemy', (ed) => {
-            const e = createHumanoid(0xff0000); e.position.set(ed.x, 0, ed.z); e.userData.serverId = ed.id;
-            scene.add(e); enemies[ed.id] = e;
+        socket.on('spawnEnemy', (d) => {
+            const e = createModel(0xff0000); e.position.set(d.x, 0, d.z); e.userData.serverId = d.id;
+            scene.add(e); enemies[d.id] = e;
         });
-        socket.on('removeEnemy', (eid) => { if(enemies[eid]) { scene.remove(enemies[eid]); delete enemies[eid]; STATE.score++; }});
+        socket.on('removeEnemy', (id) => { if(enemies[id]) { scene.remove(enemies[id]); delete enemies[id]; state.score++; }});
 
-        setupControls();
-        animate();
+        controls();
+        loop();
     }
 
     function addTeammate(id, info) {
-        const t = createHumanoid(0x00ff00); // Teammates are Green
-        t.position.set(info.x, info.y, info.z);
-        scene.add(t); otherPlayers[id] = t;
+        const t = createModel(0x00ff00); t.position.set(info.x, info.y, info.z);
+        scene.add(t); others[id] = t;
     }
 
-    function setupControls() {
-        const joyBase = document.getElementById('joystick-base'), joyKnob = document.getElementById('joystick-knob');
-        let lId = null, rId = null, lO = {x:0, y:0}, lastRx = 0;
+    function controls() {
+        const joy = document.getElementById('joystick-ui'), knob = document.getElementById('joystick-knob');
+        let lId = null, rId = null, lO = {x:0, y:0}, lastX = 0;
 
         window.addEventListener('touchstart', e => {
-            for (let t of e.changedTouches) {
-                if (t.clientX < window.innerWidth/2 && lId === null) {
+            for(let t of e.changedTouches) {
+                if(t.clientX < window.innerWidth/2 && lId === null) {
                     lId = t.identifier; lO = {x:t.clientX, y:t.clientY};
-                    joyBase.style.display = 'block'; joyBase.style.left = (lO.x - 50)+'px'; joyBase.style.top = (lO.y - 50)+'px';
-                } else if (rId === null) { rId = t.identifier; lastRx = t.clientX; }
+                    joy.style.display='block'; joy.style.left=(lO.x-50)+'px'; joy.style.top=(lO.y-50)+'px';
+                } else if(rId === null) { rId = t.identifier; lastX = t.clientX; }
             }
-        });
+        }, {passive: false});
+
         window.addEventListener('touchmove', e => {
-            for (let t of e.touches) {
-                if (t.identifier === lId) {
-                    const dx = t.clientX - lO.x, dy = t.clientY - lO.y; const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 50);
-                    const ang = Math.atan2(dy, dx); STATE.move = { x: (Math.cos(ang)*dist)/50, y: (Math.sin(ang)*dist)/50 };
-                    joyKnob.style.transform = `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px)`;
+            for(let t of e.touches) {
+                if(t.identifier === lId) {
+                    const dx = t.clientX-lO.x, dy = t.clientY-lO.y; const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 50);
+                    const ang = Math.atan2(dy, dx); state.move = { x: (Math.cos(ang)*dist)/50, y: (Math.sin(ang)*dist)/50 };
+                    knob.style.transform = `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px)`;
                 }
-                if (t.identifier === rId) { STATE.targetYaw -= (t.clientX - lastRx) * (STATE.isScoping ? 0.003 : 0.008); lastRx = t.clientX; }
+                if(t.identifier === rId) { state.targetYaw -= (t.clientX - lastX) * (state.isScoping ? 0.003 : 0.01); lastX = t.clientX; }
             }
         });
+
         window.addEventListener('touchend', e => {
-            for (let t of e.changedTouches) {
-                if(t.identifier === lId) { lId = null; STATE.move = {x:0, y:0}; joyBase.style.display='none'; }
-                if(t.identifier === rId) rId = null;
+            for(let t of e.changedTouches) {
+                if(t.identifier === lId) { lId=null; state.move={x:0, y:0}; joy.style.display='none'; }
+                if(t.identifier === rId) rId=null;
             }
         });
 
         document.getElementById('scope-btn').addEventListener('touchstart', (e) => {
-            STATE.isScoping = !STATE.isScoping;
-            gsap.to(camera, { fov: STATE.isScoping ? 30 : 75, duration: 0.3, onUpdate: () => camera.updateProjectionMatrix() });
+            state.isScoping = !state.isScoping;
+            // FIX: camera.updateProjectionMatrix MUST be called in the onUpdate
+            gsap.to(camera, { fov: state.isScoping ? 25 : 75, duration: 0.3, onUpdate: () => camera.updateProjectionMatrix() });
             e.preventDefault();
         });
-        document.getElementById('jump-btn').addEventListener('touchstart', (e) => { if(player.position.y < 0.1) player.userData.velY = CONFIG.jump; e.preventDefault(); });
-        document.getElementById('shoot-btn').addEventListener('touchstart', (e) => { fire(); e.preventDefault(); });
+        document.getElementById('jump-btn').addEventListener('touchstart', (e) => { if(player.position.y < 0.1) player.userData.velY = conf.jump; e.preventDefault(); });
+        document.getElementById('fire-btn').addEventListener('touchstart', (e) => { fire(); e.preventDefault(); });
     }
 
     function fire() {
-        if(STATE.mana < 5) return;
-        STATE.mana -= 5;
+        if(state.mana < 10) return;
+        state.mana -= 10;
         const b = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0x00ffff}));
         const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(player.quaternion);
-        b.position.copy(player.position).setY(1.5).add(dir.clone().multiplyScalar(1.2));
-        b.userData = { vel: dir.multiplyScalar(CONFIG.bulletSpeed), life: 100 };
-        scene.add(b); STATE.pBullets.push(b);
+        b.position.copy(player.position).setY(1.5).add(dir.clone().multiplyScalar(1.5));
+        b.userData = { vel: dir.multiplyScalar(conf.bulletSpeed), life: 100 };
+        scene.add(b); bullets.push(b);
     }
 
-    function animate() {
-        requestAnimationFrame(animate);
-        
-        STATE.yaw += (STATE.targetYaw - STATE.yaw) * 0.15;
-        player.rotation.y = STATE.yaw;
+    function loop() {
+        requestAnimationFrame(loop);
+        state.yaw += (state.targetYaw - state.yaw) * 0.2;
+        player.rotation.y = state.yaw;
 
-        const fwd = new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0), STATE.yaw);
-        const rgt = new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0), STATE.yaw);
-        const moveAmt = STATE.isScoping ? 0.07 : 0.15;
-        player.position.add(fwd.multiplyScalar(-STATE.move.y * moveAmt).add(rgt.multiplyScalar(STATE.move.x * moveAmt)));
+        const fwd = new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0), state.yaw);
+        const rgt = new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0), state.yaw);
+        player.position.add(fwd.multiplyScalar(-state.move.y * conf.speed).add(rgt.multiplyScalar(state.move.x * conf.speed)));
 
-        player.userData.velY -= CONFIG.gravity; player.position.y += player.userData.velY;
+        player.userData.velY -= conf.gravity; player.position.y += player.userData.velY;
         if(player.position.y < 0) { player.position.y = 0; player.userData.velY = 0; }
 
-        camera.position.lerp(player.position.clone().add(new THREE.Vector3(0, 3.5, 8).applyAxisAngle(new THREE.Vector3(0,1,0), STATE.yaw)), 0.1);
-        camera.lookAt(player.position.clone().setY(1.5));
+        // Camera Follow
+        const camOff = new THREE.Vector3(0, 3.5, 8).applyAxisAngle(new THREE.Vector3(0,1,0), state.yaw);
+        camera.position.lerp(player.position.clone().add(camOff), 0.1);
+        camera.lookAt(player.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
 
-        socket.emit('playerMovement', { x: player.position.x, y: player.position.y, z: player.position.z, yaw: STATE.yaw });
+        socket.emit('playerMovement', { x: player.position.x, y: player.position.y, z: player.position.z, yaw: state.yaw });
 
-        STATE.pBullets.forEach((b, i) => {
+        bullets.forEach((b, i) => {
             b.position.add(b.userData.vel);
             Object.values(enemies).forEach(e => {
-                if(b.position.distanceTo(e.position.clone().add(new THREE.Vector3(0,1,0))) < 2) {
-                    scene.remove(b); STATE.pBullets.splice(i, 1);
+                if(b.position.distanceTo(e.position.clone().setY(1)) < 2) {
+                    scene.remove(b); bullets.splice(i, 1);
                     socket.emit('enemyDied', e.userData.serverId);
                 }
             });
-            if(b.userData.life-- < 0) { scene.remove(b); STATE.pBullets.splice(i, 1); }
+            if(b.userData.life-- < 0) { scene.remove(b); bullets.splice(i, 1); }
         });
 
         Object.values(enemies).forEach(e => {
-            const dir = new THREE.Vector3().subVectors(player.position, e.position).normalize();
-            e.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI;
-            e.position.x += dir.x * 0.05; e.position.z += dir.z * 0.05;
+            const d = new THREE.Vector3().subVectors(player.position, e.position).normalize();
+            e.rotation.y = Math.atan2(d.x, d.z) + Math.PI;
+            e.position.x += d.x * 0.05; e.position.z += d.z * 0.05;
         });
 
-        if (STATE.mana < 100) STATE.mana += 0.1; // Passive mana regen
-        document.getElementById('mana-fill').style.width = STATE.mana + '%';
-        document.getElementById('score').innerText = STATE.score;
-        document.getElementById('count').innerText = Object.keys(enemies).length;
+        if(state.mana < 100) state.mana += 0.2;
+        document.getElementById('mana-fill').style.width = state.mana + '%';
+        document.getElementById('score').innerText = state.score;
+        document.getElementById('ecount').innerText = Object.keys(enemies).length;
 
         renderer.render(scene, camera);
     }
