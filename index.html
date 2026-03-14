@@ -115,9 +115,9 @@
         document.getElementById('fire-btn').addEventListener('touchstart', () => {
             const b = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xffff00}));
             b.position.copy(player.position).add(new THREE.Vector3(0, 1.5, 0));
-            // FIXED PROJECTILE DIRECTION
+            // BULLET FIX: Now shoots forward (opposite of camera view)
             const dir = new THREE.Vector3(Math.sin(camAngle), 0, Math.cos(camAngle));
-            b.userData.vel = dir.multiplyScalar(-1.5);
+            b.userData.vel = dir.multiplyScalar(1.5); 
             scene.add(b);
             bullets.push(b);
             gsap.to(player.userData.armR.rotation, { x: -1, duration: 0.1, yoyo: true, repeat: 1 });
@@ -127,7 +127,7 @@
             requestAnimationFrame(animate);
             const time = Date.now() * 0.006;
             
-            // THE 180 DEGREE FIX: Faces away from camera now
+            // Player faces away from camera
             player.rotation.y = camAngle + Math.PI; 
 
             const speed = 0.28;
