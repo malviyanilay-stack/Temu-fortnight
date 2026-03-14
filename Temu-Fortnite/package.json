@@ -1,7 +1,7 @@
 {
   "name": "temu-fortnite",
   "version": "1.0.0",
-  "description": "Multiplayer PvE Shooter",
+  "description": " a  fortnite parody  ",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
