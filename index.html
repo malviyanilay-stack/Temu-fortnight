@@ -7,32 +7,24 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
-        * { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; outline: none; }
+        * { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
         body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
         #ui { position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-        
         .hud { position: absolute; background: rgba(0,0,0,0.8); color: #ff4444; padding: 12px; border: 2px solid #ff4444; border-radius: 8px; font-weight: bold; pointer-events: auto; }
         #health-ui { top: 20px; left: 20px; width: 200px; }
-        #health-fill { width: 100%; height: 18px; background: #ff4444; box-shadow: 0 0 15px #ff4444; transition: width 0.3s; }
+        #health-fill { width: 100%; height: 18px; background: #ff4444; transition: width 0.2s ease-out; }
         .bar-bg { width: 100%; height: 18px; background: #222; margin-top: 8px; border-radius: 3px; overflow: hidden; }
-        
         #btns { position: absolute; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 15px; pointer-events: auto; }
-        .btn { width: 80px; height: 80px; background: rgba(0,0,0,0.7); color: white; border: 3px solid #0ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 0 10px #0ff; }
-        #fire-btn { background: #ff4444; width: 110px; height: 110px; border-color: #fff; font-size: 20px; box-shadow: 0 0 20px #ff4444; }
-        
+        .btn { width: 80px; height: 80px; background: rgba(0,0,0,0.7); color: white; border: 3px solid #0ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        #fire-btn { background: #ff4444; width: 110px; height: 110px; border-color: #fff; font-size: 20px; }
         #joystick-ui { position: absolute; bottom: 50px; left: 50px; width: 140px; height: 140px; background: rgba(0,255,255,0.1); border-radius: 50%; pointer-events: auto; border: 2px solid #0ff; }
-        #joystick-knob { position: absolute; width: 60px; height: 60px; background: #0ff; border-radius: 50%; left: 40px; top: 40px; box-shadow: 0 0 15px #0ff; }
-        
-        #zoom-ui { position: absolute; top: 20px; right: 20px; display: flex; gap: 12px; pointer-events: auto; }
-        .zoom-btn { width: 50px; height: 50px; background: rgba(0,0,0,0.8); color: #0ff; border: 2px solid #0ff; display: flex; align-items: center; justify-content: center; font-size: 24px; border-radius: 8px; }
+        #joystick-knob { position: absolute; width: 60px; height: 60px; background: #0ff; border-radius: 50%; left: 40px; top: 40px; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <div id="health-ui" class="hud">HEALTHBAR<div class="bar-bg"><div id="health-fill"></div></div></div>
-        <div id="zoom-ui"><div class="zoom-btn" id="zin">+</div><div class="zoom-btn" id="zout">-</div></div>
+        <div id="health-ui" class="hud">HEALTHBAR<div class="bar-bg"><div id="health-fill" style="width: 100%;"></div></div></div>
         <div id="btns">
-            <div id="scope-btn" class="btn">SCOPE</div>
             <div id="fire-btn" class="btn">FIRE</div>
             <div id="jump-btn" class="btn">JUMP</div>
         </div>
@@ -40,16 +32,8 @@
     </div>
 
     <script>
-        // --- ANTI-ZOOM / BROWSER LOCK ---
         document.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-        let lastT = 0;
-        document.addEventListener('touchend', e => {
-            const now = Date.now();
-            if (now - lastT <= 300) e.preventDefault();
-            lastT = now;
-        }, false);
 
-        // --- SCENE SETUP ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87ceeb);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -57,135 +41,155 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.AmbientLight(0x909090), new THREE.DirectionalLight(0xffffff, 1.0));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6), new THREE.DirectionalLight(0xffffff, 0.8));
 
         const floor = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({ color: 0x2e7d32 }));
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
 
-        // --- PLAYER ---
-        const player = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.5), new THREE.MeshStandardMaterial({color: 0x333333}));
-        body.position.y = 1.4;
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({color: 0xffdbac}));
-        head.position.y = 2.2;
-        const armR = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.8, 0.3), new THREE.MeshStandardMaterial({color: 0x333333}));
-        armR.position.set(0.6, 1.4, 0);
-        const gun = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 1.0), new THREE.MeshStandardMaterial({color: 0x000000}));
-        gun.position.set(0, -0.2, -0.4); armR.add(gun);
-        player.add(body, head, armR);
-        scene.add(player);
-        player.userData = { isJumping: false, armR };
+        // --- CHARACTER CREATOR FUNCTION ---
+        function createCharacter(color) {
+            const group = new THREE.Group();
+            const skin = new THREE.MeshStandardMaterial({color: 0xffdbac});
+            const suit = new THREE.MeshStandardMaterial({color: color});
+            
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.1, 0.4), suit);
+            torso.position.y = 1.45;
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skin);
+            head.position.y = 2.25;
+            
+            const armL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.8, 0.25), suit);
+            armL.position.set(-0.5, 1.5, 0);
+            const armR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.8, 0.25), suit);
+            armR.position.set(0.5, 1.5, 0);
+            
+            const gun = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.2, 0.9), new THREE.MeshStandardMaterial({color: 0x000000}));
+            gun.position.set(0, -0.3, -0.4);
+            armR.add(gun);
 
-        // --- ENEMIES (The Tracking Logic) ---
-        const enemies = [];
-        function spawnEnemy() {
-            const eGroup = new THREE.Group();
-            const eBody = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({color: 0xff0000}));
-            eBody.position.y = 1;
-            eGroup.add(eBody);
-            // Spawn far away from player
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 40 + Math.random() * 40;
-            eGroup.position.set(player.position.x + Math.cos(angle)*dist, 0, player.position.z + Math.sin(angle)*dist);
-            scene.add(eGroup);
-            enemies.push(eGroup);
+            const legL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.3), suit);
+            legL.position.set(-0.2, 0.45, 0);
+            const legR = legL.clone(); legR.position.x = 0.2;
+
+            group.add(torso, head, armL, armR, legL, legR);
+            return { group, armR, armL, legL, legR };
         }
-        for(let i=0; i<8; i++) spawnEnemy();
 
-        // --- SYSTEM VARS ---
-        const bullets = [];
-        let camAngle = 0, targetCamAngle = 0, camDist = 14, lastX = 0;
-        let joy = { x: 0, y: 0 };
+        // Setup Player
+        const pData = createCharacter(0x222222);
+        const player = pData.group;
+        scene.add(player);
+        let playerHealth = 100;
 
-        // --- INPUTS ---
+        // Setup Enemies
+        const enemies = [];
+        function spawnOpponent() {
+            const eData = createCharacter(0xff4444);
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 35 + Math.random() * 20;
+            eData.group.position.set(player.position.x + Math.cos(angle)*dist, 0, player.position.z + Math.sin(angle)*dist);
+            eData.lastShot = 0;
+            scene.add(eData.group);
+            enemies.push(eData);
+        }
+        for(let i=0; i<5; i++) spawnOpponent();
+
+        const pBullets = [], eBullets = [];
+        let camAngle = 0, targetCamAngle = 0, camDist = 14, lastX = 0, joy = {x:0, y:0};
+
+        // INPUT HANDLERS
         window.addEventListener('touchstart', e => { if(e.touches[0].clientX > window.innerWidth/2) lastX = e.touches[0].clientX; });
         window.addEventListener('touchmove', e => {
             const touch = Array.from(e.touches).find(t => t.clientX > window.innerWidth/2);
-            if(touch) {
-                targetCamAngle -= (touch.clientX - lastX) * 0.008; // SMOOTH SENSITIVITY
-                lastX = touch.clientX;
-            }
+            if(touch) { targetCamAngle -= (touch.clientX - lastX) * 0.01; lastX = touch.clientX; }
         });
 
-        document.getElementById('zin').onclick = () => camDist = Math.max(6, camDist - 3);
-        document.getElementById('zout').onclick = () => camDist = Math.min(30, camDist + 3);
+        document.getElementById('fire-btn').addEventListener('touchstart', () => {
+            const b = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xffff00}));
+            b.position.copy(player.position).add(new THREE.Vector3(0, 1.7, 0));
+            const dir = new THREE.Vector3(Math.sin(camAngle), 0, Math.cos(camAngle));
+            b.userData.vel = dir.multiplyScalar(1.5);
+            scene.add(b); pBullets.push(b);
+            gsap.to(pData.armR.rotation, { x: -0.7, duration: 0.1, yoyo: true, repeat: 1 });
+        });
 
         document.getElementById('jump-btn').onclick = () => {
-            if(!player.userData.isJumping) {
-                player.userData.isJumping = true;
-                gsap.to(player.position, { y: 6, duration: 0.4, yoyo: true, repeat: 1, ease: "power2.out", onComplete: () => {
-                    player.userData.isJumping = false; player.position.y = 0;
-                }});
-            }
+            if(player.position.y < 0.1) gsap.to(player.position, { y: 6, duration: 0.4, yoyo: true, repeat: 1, ease: "power2.out" });
         };
 
         const knob = document.getElementById('joystick-knob');
         document.getElementById('joystick-ui').addEventListener('touchmove', e => {
             const t = e.touches[0], r = e.currentTarget.getBoundingClientRect();
-            joy.x = (t.clientX - (r.left + r.width/2))/70;
-            joy.y = (t.clientY - (r.top + r.height/2))/70;
-            const d = Math.sqrt(joy.x**2 + joy.y**2);
-            if(d > 1) { joy.x/=d; joy.y/=d; }
+            joy.x = (t.clientX - (r.left + r.width/2))/70; joy.y = (t.clientY - (r.top + r.height/2))/70;
+            const d = Math.sqrt(joy.x**2 + joy.y**2); if(d > 1) { joy.x/=d; joy.y/=d; }
             knob.style.transform = `translate(${joy.x*45}px, ${joy.y*45}px)`;
         });
-        document.getElementById('joystick-ui').addEventListener('touchend', () => { 
-            joy = {x:0, y:0}; knob.style.transform = `translate(0,0)`; 
-        });
+        document.getElementById('joystick-ui').addEventListener('touchend', () => { joy = {x:0, y:0}; knob.style.transform = `translate(0,0)`; });
 
-        document.getElementById('fire-btn').addEventListener('touchstart', () => {
-            const b = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xffff00}));
-            b.position.copy(player.position).add(new THREE.Vector3(0, 1.6, 0));
-            const dir = new THREE.Vector3(Math.sin(camAngle), 0, Math.cos(camAngle));
-            b.userData.vel = dir.multiplyScalar(1.6);
-            scene.add(b); bullets.push(b);
-            gsap.to(player.userData.armR.rotation, { x: -0.8, duration: 0.1, yoyo: true, repeat: 1 });
-        });
-
-        // --- GAME LOOP ---
         function animate() {
             requestAnimationFrame(animate);
-            
-            // 1. Smooth Camera Transition
-            camAngle += (targetCamAngle - camAngle) * 0.12; 
+            const time = Date.now() * 0.008;
+            camAngle += (targetCamAngle - camAngle) * 0.15;
             player.rotation.y = camAngle + Math.PI;
 
-            // 2. Movement Logic (Fixed Left/Right)
-            const speed = 0.35;
-            const forward = new THREE.Vector3(Math.sin(camAngle), 0, Math.cos(camAngle));
-            const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), forward);
-            player.position.add(forward.multiplyScalar(-joy.y * speed));
-            player.position.add(right.multiplyScalar(-joy.x * speed));
+            // Player Move
+            const fwd = new THREE.Vector3(Math.sin(camAngle), 0, Math.cos(camAngle));
+            const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), fwd);
+            player.position.add(fwd.multiplyScalar(-joy.y * 0.35));
+            player.position.add(side.multiplyScalar(-joy.x * 0.35));
 
-            // 3. Enemy AI (Chase Player)
+            // Player Walk Anim
+            if(Math.abs(joy.x) > 0.1 || Math.abs(joy.y) > 0.1) {
+                pData.legL.rotation.x = Math.sin(time) * 0.6; pData.legR.rotation.x = -Math.sin(time) * 0.6;
+            }
+
+            // Enemy Logic
             enemies.forEach((en, i) => {
-                const dirToPlayer = new THREE.Vector3().subVectors(player.position, en.position).normalize();
-                en.position.add(dirToPlayer.multiplyScalar(0.08)); // Enemy Speed
-                en.lookAt(player.position.x, 0, player.position.z);
+                const dist = en.group.position.distanceTo(player.position);
+                const dir = new THREE.Vector3().subVectors(player.position, en.group.position).normalize();
                 
-                // If enemy touches player
-                if(en.position.distanceTo(player.position) < 1.5) {
-                    // Logic for taking damage could go here
+                // Chase if far, stop and shoot if close
+                if(dist > 12) en.group.position.add(dir.multiplyScalar(0.08));
+                en.group.lookAt(player.position.x, 0, player.position.z);
+                
+                // Enemy Walk Anim
+                en.legL.rotation.x = Math.sin(time) * 0.5; en.legR.rotation.x = -Math.sin(time) * 0.5;
+
+                // Enemy Shooting logic
+                if(Date.now() - en.lastShot > 2000 && dist < 30) {
+                    const eb = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xff4400}));
+                    eb.position.copy(en.group.position).add(new THREE.Vector3(0, 1.7, 0));
+                    eb.userData.vel = dir.clone().multiplyScalar(0.6);
+                    scene.add(eb); eBullets.push(eb);
+                    en.lastShot = Date.now();
                 }
             });
 
-            // 4. Bullet & Collision Logic
-            bullets.forEach((b, bi) => {
+            // Bullet Collision (Player Bullets -> Enemies)
+            pBullets.forEach((b, bi) => {
                 b.position.add(b.userData.vel);
                 enemies.forEach((en, ei) => {
-                    if(b.position.distanceTo(en.position) < 2) {
-                        scene.remove(en); enemies.splice(ei, 1);
-                        scene.remove(b); bullets.splice(bi, 1);
-                        spawnEnemy(); // Respawn a new hunter
+                    if(b.position.distanceTo(en.group.position) < 2) {
+                        scene.remove(en.group); enemies.splice(ei, 1);
+                        scene.remove(b); pBullets.splice(bi, 1);
+                        spawnOpponent();
                     }
                 });
-                if(b.position.distanceTo(player.position) > 120) { scene.remove(b); bullets.splice(bi, 1); }
             });
 
-            // 5. Camera Level & Height Lock
-            camera.position.set(player.position.x - Math.sin(camAngle)*camDist, player.position.y + 8, player.position.z - Math.cos(camAngle)*camDist);
+            // Bullet Collision (Enemy Bullets -> Player)
+            eBullets.forEach((eb, ebi) => {
+                eb.position.add(eb.userData.vel);
+                if(eb.position.distanceTo(player.position) < 1.5) {
+                    playerHealth -= 10;
+                    document.getElementById('health-fill').style.width = playerHealth + "%";
+                    scene.remove(eb); eBullets.splice(ebi, 1);
+                    if(playerHealth <= 0) { playerHealth = 100; document.getElementById('health-fill').style.width = "100%"; }
+                }
+            });
+
+            camera.position.set(player.position.x - Math.sin(camAngle)*camDist, 8, player.position.z - Math.cos(camAngle)*camDist);
             camera.lookAt(player.position.x, player.position.y + 2, player.position.z);
-            
             renderer.render(scene, camera);
         }
         animate();
