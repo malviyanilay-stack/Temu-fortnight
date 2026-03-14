@@ -12,30 +12,25 @@ const players = {};
 let enemies = {};
 let enemyIdCounter = 0;
 
-// Continuous Enemy Spawning
+// Spawns enemies every 4 seconds
 setInterval(() => {
-    const playerIds = Object.keys(players);
-    if (playerIds.length > 0) {
-        const randomPlayer = players[playerIds[Math.floor(Math.random() * playerIds.length)]];
+    if (Object.keys(players).length > 0) {
+        const id = enemyIdCounter++;
         const angle = Math.random() * Math.PI * 2;
+        const dist = 30 + Math.random() * 20;
         
-        const enemy = {
-            id: enemyIdCounter++,
-            x: randomPlayer.x + Math.cos(angle) * 50,
-            y: 0,
-            z: randomPlayer.z + Math.sin(angle) * 50,
+        enemies[id] = {
+            id: id,
+            x: Math.cos(angle) * dist,
+            z: Math.sin(angle) * dist,
             hp: 3
         };
-        
-        enemies[enemy.id] = enemy;
-        io.emit('spawnEnemy', enemy);
+        io.emit('spawnEnemy', enemies[id]);
     }
-}, 3000); 
+}, 4000);
 
 io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`);
     players[socket.id] = { x: 0, y: 0, z: 0, yaw: 0 };
-    
     socket.emit('currentPlayers', players);
     socket.emit('currentEnemies', enemies);
     socket.broadcast.emit('newPlayer', { id: socket.id, playerInfo: players[socket.id] });
@@ -61,4 +56,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server active on port ${PORT}`));
