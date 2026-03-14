@@ -7,32 +7,41 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
-        /* --- THE NON-AUTO ZOOM LOCKS --- */
-        * { 
-            touch-action: none; 
-            -webkit-user-select: none; 
-            user-select: none; 
-            -webkit-tap-highlight-color: transparent; 
-        }
+        * { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
         body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
-        
         #ui { position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-        .hud { position: absolute; background: rgba(0,0,0,0.8); color: #ff4444; padding: 12px; border: 2px solid #ff4444; border-radius: 8px; font-weight: bold; pointer-events: auto; }
-        #health-ui { top: 20px; left: 20px; width: 200px; }
-        #health-fill { width: 100%; height: 18px; background: #ff4444; transition: width 0.2s; }
-        .bar-bg { width: 100%; height: 18px; background: #222; margin-top: 8px; }
         
+        /* TOP LEFT: MINI-MAP */
+        #minimap { position: absolute; top: 15px; left: 15px; width: 120px; height: 120px; background: rgba(0,0,0,0.7); border: 2px solid #0ff; border-radius: 5px; pointer-events: auto; overflow: hidden; }
+        .map-dot { position: absolute; width: 6px; height: 6px; border-radius: 50%; transform: translate(-50%, -50%); }
+        #player-dot { background: #0ff; z-index: 2; }
+
+        /* TOP RIGHT: STAT CHART */
+        #stat-chart { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.8); color: #0ff; padding: 10px; border: 1px solid #0ff; font-family: monospace; font-size: 12px; pointer-events: auto; min-width: 140px; }
+        .stat-line { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .stat-val { color: #fff; font-weight: bold; }
+
+        /* HEALTH/MANA BAR */
+        #health-ui { position: absolute; top: 145px; left: 15px; width: 180px; background: rgba(0,0,0,0.8); padding: 8px; border: 1px solid #ff4444; border-radius: 4px; }
+        #health-fill { width: 100%; height: 12px; background: #ff4444; transition: width 0.2s; }
+        .bar-bg { width: 100%; height: 12px; background: #222; margin-top: 5px; }
+
         #btns { position: absolute; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 15px; pointer-events: auto; }
         .btn { width: 80px; height: 80px; background: rgba(0,0,0,0.7); color: white; border: 3px solid #0ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
         #fire-btn { background: #ff4444; width: 110px; height: 110px; border-color: #fff; font-size: 20px; }
-        
         #joystick-ui { position: absolute; bottom: 50px; left: 50px; width: 140px; height: 140px; background: rgba(0,255,255,0.1); border-radius: 50%; pointer-events: auto; border: 2px solid #0ff; }
         #joystick-knob { position: absolute; width: 60px; height: 60px; background: #0ff; border-radius: 50%; left: 40px; top: 40px; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <div id="health-ui" class="hud">HEALTHBAR<div class="bar-bg"><div id="health-fill" style="width: 100%;"></div></div></div>
+        <div id="minimap"><div id="player-dot" class="map-dot"></div></div>
+        <div id="stat-chart">
+            <div class="stat-line">ENEMIES: <span id="count-e" class="stat-val">0</span></div>
+            <div class="stat-line">MY KILLS: <span id="count-pk" class="stat-val">0</span></div>
+            <div class="stat-line">SERVER TOTAL: <span id="count-sk" class="stat-val">0</span></div>
+        </div>
+        <div id="health-ui">MANA<div class="bar-bg"><div id="health-fill"></div></div></div>
         <div id="btns">
             <div id="fire-btn" class="btn">FIRE</div>
             <div id="jump-btn" class="btn">JUMP</div>
@@ -41,16 +50,9 @@
     </div>
 
     <script>
-        // --- PREVENT BROWSER ZOOMING ---
+        // ANTI-ZOOM
         document.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-        let lastTouch = 0;
-        document.addEventListener('touchend', e => {
-            const now = Date.now();
-            if (now - lastTouch <= 300) e.preventDefault();
-            lastTouch = now;
-        }, false);
-
-        // --- SCENE SETUP ---
+        
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87ceeb);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -64,15 +66,9 @@
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
 
-        function spawnTree(x, z) {
-            const tree = new THREE.Group();
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 5), new THREE.MeshStandardMaterial({color: 0x5d4037}));
-            trunk.position.y = 2.5;
-            const leaves = new THREE.Mesh(new THREE.SphereGeometry(2.5), new THREE.MeshStandardMaterial({color: 0x1a5d1a}));
-            leaves.position.y = 6;
-            tree.add(trunk, leaves); tree.position.set(x, 0, z); scene.add(tree);
-        }
-        for(let i=0; i<30; i++) spawnTree(Math.random()*300-150, Math.random()*300-150);
+        // Stats
+        let myKills = 0, serverKills = 0;
+        const BULLET_SPEED = 1.2; // Standardized for everyone
 
         function createChar(color) {
             const g = new THREE.Group();
@@ -89,7 +85,7 @@
             legL.position.set(-0.25, 0.5, 0);
             const legR = legL.clone(); legR.position.x = 0.25;
             g.add(torso, head, armL, armR, legL, legR);
-            return { group: g, armR, armL, legL, legR };
+            return { group: g, armR, legL, legR };
         }
 
         const pData = createChar(0x222222);
@@ -97,13 +93,27 @@
         let playerHealth = 100;
 
         const enemies = [];
+        const minimapDiv = document.getElementById('minimap');
+
         function spawnEnemy() {
             const e = createChar(0xff4444);
-            const a = Math.random()*6.28; const d = 40+Math.random()*20;
+            const a = Math.random()*6.28; const d = 30+Math.random()*30;
             e.group.position.set(player.position.x + Math.cos(a)*d, 0, player.position.z + Math.sin(a)*d);
-            e.lastShot = 0; scene.add(e.group); enemies.push(e);
+            e.lastShot = 0;
+            e.dot = document.createElement('div');
+            e.dot.className = 'map-dot';
+            e.dot.style.background = 'red';
+            minimapDiv.appendChild(e.dot);
+            scene.add(e.group); enemies.push(e);
+            updateChart();
         }
-        for(let i=0; i<6; i++) spawnEnemy();
+        for(let i=0; i<8; i++) spawnEnemy();
+
+        function updateChart() {
+            document.getElementById('count-e').innerText = enemies.length;
+            document.getElementById('count-pk').innerText = myKills;
+            document.getElementById('count-sk').innerText = serverKills;
+        }
 
         const pBullets = [], eBullets = [];
         let camAngle = 0, targetCamAngle = 0, camDist = 14, lastX = 0, joy = {x:0, y:0};
@@ -118,7 +128,7 @@
             const b = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xffff00}));
             b.position.copy(player.position).add(new THREE.Vector3(0, 1.8, 0));
             const dir = new THREE.Vector3(Math.sin(camAngle), 0, Math.cos(camAngle));
-            b.userData.vel = dir.multiplyScalar(1.8);
+            b.userData.vel = dir.multiplyScalar(BULLET_SPEED);
             scene.add(b); pBullets.push(b);
             gsap.to(pData.armR.rotation, { x: -0.7, duration: 0.1, yoyo: true, repeat: 1 });
         });
@@ -142,62 +152,65 @@
 
             const fwd = new THREE.Vector3(Math.sin(camAngle), 0, Math.cos(camAngle));
             const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), fwd);
-            player.position.add(fwd.multiplyScalar(-joy.y * 0.38));
-            player.position.add(side.multiplyScalar(-joy.x * 0.38));
+            player.position.add(fwd.multiplyScalar(-joy.y * 0.4));
+            player.position.add(side.multiplyScalar(-joy.x * 0.4));
 
-            if(Math.abs(joy.x)>0.1 || Math.abs(joy.y)>0.1) {
-                pData.legL.rotation.x = Math.sin(t)*0.6; pData.legR.rotation.x = -Math.sin(t)*0.6;
-            }
+            // Minimap Player
+            const pDot = document.getElementById('player-dot');
+            pDot.style.left = '60px'; pDot.style.top = '60px';
 
             enemies.forEach((en, i) => {
                 const dist = en.group.position.distanceTo(player.position);
                 const dir = new THREE.Vector3().subVectors(player.position, en.group.position).normalize();
                 
-                // ENEMY TOUCH DAMAGE: Despawn and hurt player if they touch
-                if(dist < 1.6) {
-                    playerHealth -= 15;
-                    document.getElementById('health-fill').style.width = playerHealth + "%";
-                    scene.remove(en.group); enemies.splice(i, 1);
+                // Minimap update
+                const relX = (en.group.position.x - player.position.x) * 1.5 + 60;
+                const relZ = (en.group.position.z - player.position.z) * 1.5 + 60;
+                en.dot.style.left = relX + 'px'; en.dot.style.top = relZ + 'px';
+                en.dot.style.display = (relX < 0 || relX > 120 || relZ < 0 || relZ > 120) ? 'none' : 'block';
+
+                if(dist < 1.8) {
+                    playerHealth -= 20;
+                    scene.remove(en.group); en.dot.remove(); enemies.splice(i, 1);
                     spawnEnemy();
-                } else if(dist > 15) {
-                    en.group.position.add(dir.multiplyScalar(0.08));
+                } else if(dist > 14) {
+                    en.group.position.add(dir.multiplyScalar(0.09));
                 }
                 en.group.lookAt(player.position.x, 0, player.position.z);
-                en.legL.rotation.x = Math.sin(t)*0.5; en.legR.rotation.x = -Math.sin(t)*0.5;
 
-                if(Date.now() - en.lastShot > 2500 && dist < 40) {
+                if(Date.now() - en.lastShot > 2200 && dist < 45) {
                     const eb = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xff0000}));
                     eb.position.copy(en.group.position).add(new THREE.Vector3(0, 1.8, 0));
-                    eb.userData.vel = dir.clone().multiplyScalar(0.7); // BULLET VELOCITY
+                    eb.userData.vel = dir.clone().multiplyScalar(BULLET_SPEED);
                     scene.add(eb); eBullets.push(eb);
                     en.lastShot = Date.now();
                 }
             });
 
-            // FIXED: pBullets movement
-            pBullets.forEach((b, i) => {
-                b.position.add(b.userData.vel);
-                enemies.forEach((en, ei) => {
-                    if(b.position.distanceTo(en.group.position) < 2) {
-                        scene.remove(en.group); enemies.splice(ei, 1);
-                        scene.remove(b); pBullets.splice(i, 1);
-                        spawnEnemy();
+            // Bullets logic
+            [pBullets, eBullets].forEach((list, type) => {
+                list.forEach((b, i) => {
+                    b.position.add(b.userData.vel);
+                    if(type === 0) { // Player bullets hit enemies
+                        enemies.forEach((en, ei) => {
+                            if(b.position.distanceTo(en.group.position) < 2) {
+                                scene.remove(en.group); en.dot.remove(); enemies.splice(ei, 1);
+                                scene.remove(b); list.splice(i, 1);
+                                myKills++; serverKills++; spawnEnemy(); updateChart();
+                            }
+                        });
+                    } else { // Enemy bullets hit player
+                        if(b.position.distanceTo(player.position) < 1.6) {
+                            playerHealth -= 10;
+                            scene.remove(b); list.splice(i, 1);
+                        }
                     }
+                    if(b.position.y < -1 || b.position.distanceTo(player.position) > 150) { scene.remove(b); list.splice(i, 1); }
                 });
             });
 
-            // FIXED: eBullets movement (No more mid-air pausing)
-            eBullets.forEach((eb, i) => {
-                eb.position.add(eb.userData.vel);
-                if(eb.position.distanceTo(player.position) < 1.6) {
-                    playerHealth -= 10;
-                    document.getElementById('health-fill').style.width = playerHealth + "%";
-                    scene.remove(eb); eBullets.splice(i, 1);
-                }
-                if(eb.position.y < -1) { scene.remove(eb); eBullets.splice(i, 1); }
-            });
-
-            if(playerHealth <= 0) { playerHealth = 100; document.getElementById('health-fill').style.width = "100%"; }
+            document.getElementById('health-fill').style.width = playerHealth + "%";
+            if(playerHealth <= 0) { playerHealth = 100; serverKills++; updateChart(); }
 
             camera.position.set(player.position.x - Math.sin(camAngle)*camDist, 8, player.position.z - Math.cos(camAngle)*camDist);
             camera.lookAt(player.position.x, player.position.y + 2, player.position.z);
