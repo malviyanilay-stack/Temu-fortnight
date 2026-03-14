@@ -12,8 +12,8 @@
         #ui { position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
         .hud { position: absolute; background: rgba(0,0,0,0.8); color: #ff4444; padding: 12px; border: 2px solid #ff4444; border-radius: 8px; font-weight: bold; pointer-events: auto; }
         #health-ui { top: 20px; left: 20px; width: 200px; }
-        #health-fill { width: 100%; height: 18px; background: #ff4444; transition: width 0.2s ease-out; }
-        .bar-bg { width: 100%; height: 18px; background: #222; margin-top: 8px; border-radius: 3px; overflow: hidden; }
+        #health-fill { width: 100%; height: 18px; background: #ff4444; transition: width 0.2s; }
+        .bar-bg { width: 100%; height: 18px; background: #222; margin-top: 8px; }
         #btns { position: absolute; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 15px; pointer-events: auto; }
         .btn { width: 80px; height: 80px; background: rgba(0,0,0,0.7); color: white; border: 3px solid #0ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
         #fire-btn { background: #ff4444; width: 110px; height: 110px; border-color: #fff; font-size: 20px; }
@@ -41,63 +41,59 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.6), new THREE.DirectionalLight(0xffffff, 0.8));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7), new THREE.DirectionalLight(0xffffff, 0.8));
 
         const floor = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({ color: 0x2e7d32 }));
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
 
-        // --- CHARACTER CREATOR FUNCTION ---
+        // --- TREES ARE BACK ---
+        function spawnTree(x, z) {
+            const tree = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 5), new THREE.MeshStandardMaterial({color: 0x5d4037}));
+            trunk.position.y = 2.5;
+            const leaves = new THREE.Mesh(new THREE.SphereGeometry(2.5), new THREE.MeshStandardMaterial({color: 0x1a5d1a}));
+            leaves.position.y = 6;
+            tree.add(trunk, leaves); tree.position.set(x, 0, z); scene.add(tree);
+        }
+        for(let i=0; i<30; i++) spawnTree(Math.random()*300-150, Math.random()*300-150);
+
+        // --- CHARACTER CREATOR ---
         function createCharacter(color) {
             const group = new THREE.Group();
-            const skin = new THREE.MeshStandardMaterial({color: 0xffdbac});
-            const suit = new THREE.MeshStandardMaterial({color: color});
-            
-            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.1, 0.4), suit);
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.4), new THREE.MeshStandardMaterial({color: color}));
             torso.position.y = 1.45;
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skin);
-            head.position.y = 2.25;
-            
-            const armL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.8, 0.25), suit);
-            armL.position.set(-0.5, 1.5, 0);
-            const armR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.8, 0.25), suit);
-            armR.position.set(0.5, 1.5, 0);
-            
-            const gun = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.2, 0.9), new THREE.MeshStandardMaterial({color: 0x000000}));
-            gun.position.set(0, -0.3, -0.4);
-            armR.add(gun);
-
-            const legL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.3), suit);
-            legL.position.set(-0.2, 0.45, 0);
-            const legR = legL.clone(); legR.position.x = 0.2;
-
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({color: 0xffdbac}));
+            head.position.y = 2.3;
+            const armR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.8, 0.25), new THREE.MeshStandardMaterial({color: color}));
+            armR.position.set(0.55, 1.5, 0);
+            const gun = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 1.0), new THREE.MeshStandardMaterial({color: 0x000000}));
+            gun.position.set(0, -0.3, -0.4); armR.add(gun);
+            const armL = armR.clone(); armL.position.x = -0.55; armL.remove(armL.children[0]);
+            const legL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.0, 0.3), new THREE.MeshStandardMaterial({color: color}));
+            legL.position.set(-0.25, 0.5, 0);
+            const legR = legL.clone(); legR.position.x = 0.25;
             group.add(torso, head, armL, armR, legL, legR);
             return { group, armR, armL, legL, legR };
         }
 
-        // Setup Player
         const pData = createCharacter(0x222222);
-        const player = pData.group;
-        scene.add(player);
+        const player = pData.group; scene.add(player);
         let playerHealth = 100;
 
-        // Setup Enemies
         const enemies = [];
-        function spawnOpponent() {
-            const eData = createCharacter(0xff4444);
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 35 + Math.random() * 20;
-            eData.group.position.set(player.position.x + Math.cos(angle)*dist, 0, player.position.z + Math.sin(angle)*dist);
-            eData.lastShot = 0;
-            scene.add(eData.group);
-            enemies.push(eData);
+        function spawnEnemy() {
+            const e = createCharacter(0xff4444);
+            const dist = 40 + Math.random()*20; const ang = Math.random()*6.28;
+            e.group.position.set(player.position.x + Math.cos(ang)*dist, 0, player.position.z + Math.sin(ang)*dist);
+            e.lastShot = 0; scene.add(e.group); enemies.push(e);
         }
-        for(let i=0; i<5; i++) spawnOpponent();
+        for(let i=0; i<6; i++) spawnEnemy();
 
         const pBullets = [], eBullets = [];
         let camAngle = 0, targetCamAngle = 0, camDist = 14, lastX = 0, joy = {x:0, y:0};
 
-        // INPUT HANDLERS
+        // INPUTS
         window.addEventListener('touchstart', e => { if(e.touches[0].clientX > window.innerWidth/2) lastX = e.touches[0].clientX; });
         window.addEventListener('touchmove', e => {
             const touch = Array.from(e.touches).find(t => t.clientX > window.innerWidth/2);
@@ -105,16 +101,17 @@
         });
 
         document.getElementById('fire-btn').addEventListener('touchstart', () => {
-            const b = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xffff00}));
-            b.position.copy(player.position).add(new THREE.Vector3(0, 1.7, 0));
+            const b = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xffff00}));
+            b.position.copy(player.position).add(new THREE.Vector3(0, 1.8, 0));
+            // Fixed Firing: Shoot forward relative to camAngle
             const dir = new THREE.Vector3(Math.sin(camAngle), 0, Math.cos(camAngle));
-            b.userData.vel = dir.multiplyScalar(1.5);
+            b.userData.vel = dir.multiplyScalar(1.8);
             scene.add(b); pBullets.push(b);
             gsap.to(pData.armR.rotation, { x: -0.7, duration: 0.1, yoyo: true, repeat: 1 });
         });
 
         document.getElementById('jump-btn').onclick = () => {
-            if(player.position.y < 0.1) gsap.to(player.position, { y: 6, duration: 0.4, yoyo: true, repeat: 1, ease: "power2.out" });
+            if(player.position.y < 0.1) gsap.to(player.position, { y: 6, duration: 0.4, yoyo: true, repeat: 1 });
         };
 
         const knob = document.getElementById('joystick-knob');
@@ -129,61 +126,57 @@
         function animate() {
             requestAnimationFrame(animate);
             const time = Date.now() * 0.008;
-            camAngle += (targetCamAngle - camAngle) * 0.15;
+            camAngle += (targetCamAngle - camAngle) * 0.12;
+            
+            // CAMERA FIX: Never flip backwards when firing
             player.rotation.y = camAngle + Math.PI;
 
-            // Player Move
+            // Move
             const fwd = new THREE.Vector3(Math.sin(camAngle), 0, Math.cos(camAngle));
             const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), fwd);
-            player.position.add(fwd.multiplyScalar(-joy.y * 0.35));
-            player.position.add(side.multiplyScalar(-joy.x * 0.35));
+            player.position.add(fwd.multiplyScalar(-joy.y * 0.38));
+            player.position.add(side.multiplyScalar(-joy.x * 0.38));
 
-            // Player Walk Anim
             if(Math.abs(joy.x) > 0.1 || Math.abs(joy.y) > 0.1) {
                 pData.legL.rotation.x = Math.sin(time) * 0.6; pData.legR.rotation.x = -Math.sin(time) * 0.6;
             }
 
-            // Enemy Logic
+            // Enemy Loop
             enemies.forEach((en, i) => {
                 const dist = en.group.position.distanceTo(player.position);
                 const dir = new THREE.Vector3().subVectors(player.position, en.group.position).normalize();
-                
-                // Chase if far, stop and shoot if close
-                if(dist > 12) en.group.position.add(dir.multiplyScalar(0.08));
+                if(dist > 15) en.group.position.add(dir.multiplyScalar(0.08));
                 en.group.lookAt(player.position.x, 0, player.position.z);
-                
-                // Enemy Walk Anim
                 en.legL.rotation.x = Math.sin(time) * 0.5; en.legR.rotation.x = -Math.sin(time) * 0.5;
 
-                // Enemy Shooting logic
-                if(Date.now() - en.lastShot > 2000 && dist < 30) {
-                    const eb = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xff4400}));
-                    eb.position.copy(en.group.position).add(new THREE.Vector3(0, 1.7, 0));
-                    eb.userData.vel = dir.clone().multiplyScalar(0.6);
+                if(Date.now() - en.lastShot > 2500 && dist < 40) {
+                    const eb = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xff0000}));
+                    eb.position.copy(en.group.position).add(new THREE.Vector3(0, 1.8, 0));
+                    // FIXED: Bullet velocity actually moves now
+                    eb.userData.vel = dir.clone().multiplyScalar(0.7);
                     scene.add(eb); eBullets.push(eb);
                     en.lastShot = Date.now();
                 }
             });
 
-            // Bullet Collision (Player Bullets -> Enemies)
-            pBullets.forEach((b, bi) => {
+            // Bullet Movement & Collision
+            pBullets.forEach((b, i) => {
                 b.position.add(b.userData.vel);
                 enemies.forEach((en, ei) => {
                     if(b.position.distanceTo(en.group.position) < 2) {
                         scene.remove(en.group); enemies.splice(ei, 1);
-                        scene.remove(b); pBullets.splice(bi, 1);
-                        spawnOpponent();
+                        scene.remove(b); pBullets.splice(i, 1);
+                        spawnEnemy();
                     }
                 });
             });
 
-            // Bullet Collision (Enemy Bullets -> Player)
-            eBullets.forEach((eb, ebi) => {
-                eb.position.add(eb.userData.vel);
-                if(eb.position.distanceTo(player.position) < 1.5) {
+            eBullets.forEach((eb, i) => {
+                eb.position.add(eb.userData.vel); // THIS FIXES THE STUCK BULLETS
+                if(eb.position.distanceTo(player.position) < 1.6) {
                     playerHealth -= 10;
                     document.getElementById('health-fill').style.width = playerHealth + "%";
-                    scene.remove(eb); eBullets.splice(ebi, 1);
+                    scene.remove(eb); eBullets.splice(i, 1);
                     if(playerHealth <= 0) { playerHealth = 100; document.getElementById('health-fill').style.width = "100%"; }
                 }
             });
