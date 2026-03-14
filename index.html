@@ -11,7 +11,6 @@
         #ui { position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
         .hud { position: absolute; background: rgba(0,0,0,0.8); color: #ff4444; padding: 10px; border: 2px solid #ff4444; border-radius: 5px; font-weight: bold; }
         #health-ui { top: 20px; left: 20px; width: 180px; }
-        /* CHANGED BACK TO RED HEALTH */
         #health-fill { width: 100%; height: 15px; background: #ff4444; box-shadow: 0 0 10px #ff4444; }
         .bar-bg { width: 100%; height: 15px; background: #222; margin-top: 5px; }
         #btns { position: absolute; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 12px; pointer-events: auto; }
@@ -47,7 +46,6 @@
         sun.position.set(10, 20, 10);
         scene.add(sun, new THREE.AmbientLight(0x707070));
 
-        // THE TREES ARE BACK
         const floor = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({ color: 0x2e7d32 }));
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
@@ -60,7 +58,7 @@
             leaves.position.y = 5;
             tree.add(trunk, leaves); tree.position.set(x, 0, z); scene.add(tree);
         }
-        for(let i=0; i<40; i++) spawnTree(Math.random()*300-150, Math.random()*300-150);
+        for(let i=0; i<40; i++) spawnTree(Math.random()*400-200, Math.random()*400-200);
 
         function createPlayer() {
             const group = new THREE.Group();
@@ -117,6 +115,7 @@
         document.getElementById('fire-btn').addEventListener('touchstart', () => {
             const b = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xffff00}));
             b.position.copy(player.position).add(new THREE.Vector3(0, 1.5, 0));
+            // FIXED PROJECTILE DIRECTION
             const dir = new THREE.Vector3(Math.sin(camAngle), 0, Math.cos(camAngle));
             b.userData.vel = dir.multiplyScalar(-1.5);
             scene.add(b);
@@ -127,7 +126,9 @@
         function animate() {
             requestAnimationFrame(animate);
             const time = Date.now() * 0.006;
-            player.rotation.y = camAngle; // FACING CORRECTED
+            
+            // THE 180 DEGREE FIX: Faces away from camera now
+            player.rotation.y = camAngle + Math.PI; 
 
             const speed = 0.28;
             player.position.x += (Math.sin(camAngle) * -joy.y + Math.cos(camAngle) * joy.x) * speed;
