@@ -11,48 +11,41 @@
         body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
         #ui { position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
         
-        /* TOP LEFT: MINI-MAP */
-        #minimap { position: absolute; top: 15px; left: 15px; width: 120px; height: 120px; background: rgba(0,0,0,0.7); border: 2px solid #0ff; border-radius: 5px; pointer-events: auto; overflow: hidden; }
+        #minimap { position: absolute; top: 15px; left: 15px; width: 110px; height: 110px; background: rgba(0,0,0,0.8); border: 2px solid #0ff; border-radius: 5px; pointer-events: auto; }
         .map-dot { position: absolute; width: 6px; height: 6px; border-radius: 50%; transform: translate(-50%, -50%); }
-        #player-dot { background: #0ff; z-index: 2; }
+        #p-dot { background: #0ff; left: 55px; top: 55px; z-index: 2; }
 
-        /* TOP RIGHT: STAT CHART */
-        #stat-chart { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.8); color: #0ff; padding: 10px; border: 1px solid #0ff; font-family: monospace; font-size: 12px; pointer-events: auto; min-width: 140px; }
-        .stat-line { display: flex; justify-content: space-between; margin-bottom: 4px; }
-        .stat-val { color: #fff; font-weight: bold; }
-
-        /* HEALTH/MANA BAR */
-        #health-ui { position: absolute; top: 145px; left: 15px; width: 180px; background: rgba(0,0,0,0.8); padding: 8px; border: 1px solid #ff4444; border-radius: 4px; }
-        #health-fill { width: 100%; height: 12px; background: #ff4444; transition: width 0.2s; }
-        .bar-bg { width: 100%; height: 12px; background: #222; margin-top: 5px; }
+        #stat-chart { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.8); color: #0ff; padding: 10px; border: 1px solid #0ff; font-family: monospace; min-width: 140px; }
+        .spawn-timer-bg { width: 100%; height: 4px; background: #222; margin-top: 8px; overflow: hidden; }
+        #spawn-fill { width: 0%; height: 100%; background: #0ff; }
+        
+        #health-ui { position: absolute; top: 135px; left: 15px; width: 180px; background: rgba(0,0,0,0.8); padding: 5px; border: 1px solid #ff4444; }
+        #h-fill { width: 100%; height: 10px; background: #ff4444; }
 
         #btns { position: absolute; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 15px; pointer-events: auto; }
         .btn { width: 80px; height: 80px; background: rgba(0,0,0,0.7); color: white; border: 3px solid #0ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-        #fire-btn { background: #ff4444; width: 110px; height: 110px; border-color: #fff; font-size: 20px; }
-        #joystick-ui { position: absolute; bottom: 50px; left: 50px; width: 140px; height: 140px; background: rgba(0,255,255,0.1); border-radius: 50%; pointer-events: auto; border: 2px solid #0ff; }
-        #joystick-knob { position: absolute; width: 60px; height: 60px; background: #0ff; border-radius: 50%; left: 40px; top: 40px; }
+        #fire-btn { background: #ff4444; width: 110px; height: 110px; font-size: 20px; }
+        
+        #joy-ui { position: absolute; bottom: 50px; left: 50px; width: 130px; height: 130px; background: rgba(0,255,255,0.1); border-radius: 50%; border: 2px solid #0ff; pointer-events: auto; }
+        #joy-k { position: absolute; width: 50px; height: 50px; background: #0ff; border-radius: 50%; left: 40px; top: 40px; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <div id="minimap"><div id="player-dot" class="map-dot"></div></div>
+        <div id="minimap"><div id="p-dot" class="map-dot"></div></div>
         <div id="stat-chart">
-            <div class="stat-line">ENEMIES: <span id="count-e" class="stat-val">0</span></div>
-            <div class="stat-line">MY KILLS: <span id="count-pk" class="stat-val">0</span></div>
-            <div class="stat-line">SERVER TOTAL: <span id="count-sk" class="stat-val">0</span></div>
+            <div>ELIMINATIONS: <span id="p-kills">0</span></div>
+            <div style="font-size: 10px; margin-top: 5px; color: #aaa;">NEXT REINFORCEMENT</div>
+            <div class="spawn-timer-bg"><div id="spawn-fill"></div></div>
         </div>
-        <div id="health-ui">MANA<div class="bar-bg"><div id="health-fill"></div></div></div>
-        <div id="btns">
-            <div id="fire-btn" class="btn">FIRE</div>
-            <div id="jump-btn" class="btn">JUMP</div>
-        </div>
-        <div id="joystick-ui"><div id="joystick-knob"></div></div>
+        <div id="health-ui">MANA<div style="background:#222;height:10px;margin-top:4px;"><div id="h-fill"></div></div></div>
+        <div id="btns"><div id="fire-btn" class="btn">FIRE</div><div id="jump-btn" class="btn">JUMP</div></div>
+        <div id="joy-ui"><div id="joy-k"></div></div>
     </div>
 
     <script>
-        // ANTI-ZOOM
         document.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-        
+
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87ceeb);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -61,159 +54,159 @@
         document.body.appendChild(renderer.domElement);
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.7), new THREE.DirectionalLight(0xffffff, 0.8));
-
         const floor = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshStandardMaterial({ color: 0x2e7d32 }));
-        floor.rotation.x = -Math.PI / 2;
-        scene.add(floor);
+        floor.rotation.x = -Math.PI/2; scene.add(floor);
 
-        // Stats
-        let myKills = 0, serverKills = 0;
-        const BULLET_SPEED = 1.2; // Standardized for everyone
-
-        function createChar(color) {
-            const g = new THREE.Group();
-            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.4), new THREE.MeshStandardMaterial({color}));
-            torso.position.y = 1.45;
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({color: 0xffdbac}));
-            head.position.y = 2.3;
-            const armR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.8, 0.25), new THREE.MeshStandardMaterial({color}));
-            armR.position.set(0.55, 1.5, 0);
-            const gun = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 1.0), new THREE.MeshStandardMaterial({color: 0x000000}));
-            gun.position.set(0, -0.3, -0.4); armR.add(gun);
-            const armL = armR.clone(); armL.position.x = -0.55; armL.remove(armL.children[0]);
-            const legL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.0, 0.3), new THREE.MeshStandardMaterial({color}));
-            legL.position.set(-0.25, 0.5, 0);
-            const legR = legL.clone(); legR.position.x = 0.25;
-            g.add(torso, head, armL, armR, legL, legR);
-            return { group: g, armR, legL, legR };
+        for(let i=0; i<35; i++) {
+            const t = new THREE.Group();
+            const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 5), new THREE.MeshStandardMaterial({color:0x5d4037}));
+            const lv = new THREE.Mesh(new THREE.SphereGeometry(2.2), new THREE.MeshStandardMaterial({color:0x1a5d1a}));
+            lv.position.y = 5; t.add(tr, lv); t.position.set(Math.random()*240-120, 2.5, Math.random()*240-120); scene.add(t);
         }
 
-        const pData = createChar(0x222222);
-        const player = pData.group; scene.add(player);
-        let playerHealth = 100;
+        // --- ESCALATION LOGIC ---
+        let kills = 0, hp = 100;
+        let spawnInterval = 10000; // Starts at 10 seconds
+        let lastSpawnTime = Date.now();
+        const MIN_SPAWN_INTERVAL = 3000; // Caps at 3 seconds
+        const B_SPEED = 1.6;
 
-        const enemies = [];
-        const minimapDiv = document.getElementById('minimap');
+        function createChar(col) {
+            const g = new THREE.Group();
+            const b = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.4), new THREE.MeshStandardMaterial({color:col}));
+            b.position.y = 1.4;
+            const h = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({color:0xffdbac}));
+            h.position.y = 2.2;
+            const aR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.8, 0.25), new THREE.MeshStandardMaterial({color:col}));
+            aR.position.set(0.55, 1.5, 0);
+            const gun = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.9), new THREE.MeshStandardMaterial({color:0x000000}));
+            gun.position.set(0, -0.3, -0.4); aR.add(gun);
+            const aL = aR.clone(); aL.position.x = -0.55; aL.remove(aL.children[0]);
+            const lL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.0, 0.3), new THREE.MeshStandardMaterial({color:col}));
+            lL.position.set(-0.25, 0.5, 0);
+            const lR = lL.clone(); lR.position.x = 0.25;
+            g.add(b, h, aL, aR, lL, lR);
+            return { g, aR, lL, lR };
+        }
+
+        const p = createChar(0x222222); scene.add(p.g);
+        let enemies = [];
+        const minimap = document.getElementById('minimap');
 
         function spawnEnemy() {
             const e = createChar(0xff4444);
-            const a = Math.random()*6.28; const d = 30+Math.random()*30;
-            e.group.position.set(player.position.x + Math.cos(a)*d, 0, player.position.z + Math.sin(a)*d);
-            e.lastShot = 0;
+            const ang = Math.random()*6.28; const d = 50;
+            e.g.position.set(p.g.position.x + Math.cos(ang)*d, 0, p.g.position.z + Math.sin(ang)*d);
+            e.lastS = Date.now();
             e.dot = document.createElement('div');
-            e.dot.className = 'map-dot';
-            e.dot.style.background = 'red';
-            minimapDiv.appendChild(e.dot);
-            scene.add(e.group); enemies.push(e);
-            updateChart();
+            e.dot.className = 'map-dot'; e.dot.style.background = 'red';
+            minimap.appendChild(e.dot);
+            scene.add(e.g);
+            enemies.push(e);
+            
+            // Shorten the interval for the next spawn
+            spawnInterval = Math.max(MIN_SPAWN_INTERVAL, spawnInterval - 500);
+            lastSpawnTime = Date.now();
         }
-        for(let i=0; i<8; i++) spawnEnemy();
+        
+        spawnEnemy();
 
-        function updateChart() {
-            document.getElementById('count-e').innerText = enemies.length;
-            document.getElementById('count-pk').innerText = myKills;
-            document.getElementById('count-sk').innerText = serverKills;
-        }
-
-        const pBullets = [], eBullets = [];
-        let camAngle = 0, targetCamAngle = 0, camDist = 14, lastX = 0, joy = {x:0, y:0};
+        let cAng = 0, tAng = 0, lastX = 0, joy = {x:0, y:0};
+        const pB = [], eB = [];
 
         window.addEventListener('touchstart', e => { if(e.touches[0].clientX > window.innerWidth/2) lastX = e.touches[0].clientX; });
         window.addEventListener('touchmove', e => {
-            const touch = Array.from(e.touches).find(t => t.clientX > window.innerWidth/2);
-            if(touch) { targetCamAngle -= (touch.clientX - lastX) * 0.01; lastX = touch.clientX; }
+            const t = Array.from(e.touches).find(tx => tx.clientX > window.innerWidth/2);
+            if(t) { tAng -= (t.clientX - lastX) * 0.008; lastX = t.clientX; }
         });
 
         document.getElementById('fire-btn').addEventListener('touchstart', () => {
-            const b = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xffff00}));
-            b.position.copy(player.position).add(new THREE.Vector3(0, 1.8, 0));
-            const dir = new THREE.Vector3(Math.sin(camAngle), 0, Math.cos(camAngle));
-            b.userData.vel = dir.multiplyScalar(BULLET_SPEED);
-            scene.add(b); pBullets.push(b);
-            gsap.to(pData.armR.rotation, { x: -0.7, duration: 0.1, yoyo: true, repeat: 1 });
+            const b = new THREE.Mesh(new THREE.SphereGeometry(0.28), new THREE.MeshBasicMaterial({color:0xffff00}));
+            b.position.copy(p.g.position).add(new THREE.Vector3(0, 1.8, 0));
+            const dir = new THREE.Vector3(Math.sin(cAng), 0, Math.cos(cAng));
+            b.userData.v = dir.multiplyScalar(B_SPEED);
+            scene.add(b); pB.push(b);
+            gsap.to(p.aR.rotation, { x: -0.8, duration: 0.1, yoyo: true, repeat: 1 });
         });
 
-        document.getElementById('jump-btn').onclick = () => { if(player.position.y < 0.1) gsap.to(player.position, {y:6, duration:0.4, yoyo:true, repeat:1}); };
-
-        const knob = document.getElementById('joystick-knob');
-        document.getElementById('joystick-ui').addEventListener('touchmove', e => {
+        const knob = document.getElementById('joy-k');
+        document.getElementById('joy-ui').addEventListener('touchmove', e => {
             const t = e.touches[0], r = e.currentTarget.getBoundingClientRect();
-            joy.x = (t.clientX - (r.left + r.width/2))/70; joy.y = (t.clientY - (r.top + r.height/2))/70;
+            joy.x = (t.clientX - (r.left + r.width/2))/65; joy.y = (t.clientY - (r.top + r.height/2))/65;
             const d = Math.sqrt(joy.x**2+joy.y**2); if(d>1){joy.x/=d; joy.y/=d;}
-            knob.style.transform = `translate(${joy.x*45}px, ${joy.y*45}px)`;
+            knob.style.transform = `translate(${joy.x*40}px, ${joy.y*40}px)`;
         });
-        document.getElementById('joystick-ui').addEventListener('touchend', () => { joy = {x:0, y:0}; knob.style.transform = `translate(0,0)`; });
+        document.getElementById('joy-ui').addEventListener('touchend', () => { joy = {x:0, y:0}; knob.style.transform = `translate(0,0)`; });
 
         function animate() {
             requestAnimationFrame(animate);
-            const t = Date.now() * 0.008;
-            camAngle += (targetCamAngle - camAngle) * 0.12;
-            player.rotation.y = camAngle + Math.PI;
+            const time = Date.now();
+            const animTime = time * 0.008;
+            
+            // Handle Spawn Timer
+            const elapsed = time - lastSpawnTime;
+            const progress = (elapsed / spawnInterval) * 100;
+            document.getElementById('spawn-fill').style.width = Math.min(100, progress) + "%";
+            if(elapsed >= spawnInterval) spawnEnemy();
 
-            const fwd = new THREE.Vector3(Math.sin(camAngle), 0, Math.cos(camAngle));
-            const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), fwd);
-            player.position.add(fwd.multiplyScalar(-joy.y * 0.4));
-            player.position.add(side.multiplyScalar(-joy.x * 0.4));
+            cAng += (tAng - cAng) * 0.12;
+            p.g.rotation.y = cAng + Math.PI;
 
-            // Minimap Player
-            const pDot = document.getElementById('player-dot');
-            pDot.style.left = '60px'; pDot.style.top = '60px';
+            const f = new THREE.Vector3(Math.sin(cAng), 0, Math.cos(cAng));
+            const s = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), f);
+            p.g.position.add(f.multiplyScalar(-joy.y * 0.42));
+            p.g.position.add(s.multiplyScalar(-joy.x * 0.42));
+
+            if(Math.abs(joy.x)>0.1 || Math.abs(joy.y)>0.1) {
+                p.lL.rotation.x = Math.sin(animTime)*0.6; p.lR.rotation.x = -Math.sin(animTime)*0.6;
+            }
 
             enemies.forEach((en, i) => {
-                const dist = en.group.position.distanceTo(player.position);
-                const dir = new THREE.Vector3().subVectors(player.position, en.group.position).normalize();
+                const dist = en.g.position.distanceTo(p.g.position);
+                const dir = new THREE.Vector3().subVectors(p.g.position, en.g.position).normalize();
                 
-                // Minimap update
-                const relX = (en.group.position.x - player.position.x) * 1.5 + 60;
-                const relZ = (en.group.position.z - player.position.z) * 1.5 + 60;
-                en.dot.style.left = relX + 'px'; en.dot.style.top = relZ + 'px';
-                en.dot.style.display = (relX < 0 || relX > 120 || relZ < 0 || relZ > 120) ? 'none' : 'block';
+                if(dist > 15) en.g.position.add(dir.multiplyScalar(0.12));
+                en.g.lookAt(p.g.position.x, 0, p.g.position.z);
+                en.lL.rotation.x = Math.sin(animTime)*0.5; en.lR.rotation.x = -Math.sin(animTime)*0.5;
 
-                if(dist < 1.8) {
-                    playerHealth -= 20;
-                    scene.remove(en.group); en.dot.remove(); enemies.splice(i, 1);
-                    spawnEnemy();
-                } else if(dist > 14) {
-                    en.group.position.add(dir.multiplyScalar(0.09));
-                }
-                en.group.lookAt(player.position.x, 0, player.position.z);
+                const rx = (en.g.position.x - p.g.position.x) * 1.1 + 55;
+                const rz = (en.g.position.z - p.g.position.z) * 1.1 + 55;
+                en.dot.style.left = rx+'px'; en.dot.style.top = rz+'px';
+                en.dot.style.display = (rx<0||rx>110||rz<0||rz>110)?'none':'block';
 
-                if(Date.now() - en.lastShot > 2200 && dist < 45) {
-                    const eb = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xff0000}));
-                    eb.position.copy(en.group.position).add(new THREE.Vector3(0, 1.8, 0));
-                    eb.userData.vel = dir.clone().multiplyScalar(BULLET_SPEED);
-                    scene.add(eb); eBullets.push(eb);
-                    en.lastShot = Date.now();
+                if(time - en.lastS > 2000 && dist < 60) {
+                    const eb = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color:0xff0000}));
+                    eb.position.copy(en.g.position).add(new THREE.Vector3(0, 1.8, 0));
+                    eb.userData.v = dir.clone().multiplyScalar(B_SPEED);
+                    scene.add(eb); eB.push(eb); en.lastS = time;
                 }
             });
 
-            // Bullets logic
-            [pBullets, eBullets].forEach((list, type) => {
-                list.forEach((b, i) => {
-                    b.position.add(b.userData.vel);
-                    if(type === 0) { // Player bullets hit enemies
-                        enemies.forEach((en, ei) => {
-                            if(b.position.distanceTo(en.group.position) < 2) {
-                                scene.remove(en.group); en.dot.remove(); enemies.splice(ei, 1);
-                                scene.remove(b); list.splice(i, 1);
-                                myKills++; serverKills++; spawnEnemy(); updateChart();
-                            }
-                        });
-                    } else { // Enemy bullets hit player
-                        if(b.position.distanceTo(player.position) < 1.6) {
-                            playerHealth -= 10;
-                            scene.remove(b); list.splice(i, 1);
-                        }
+            pB.forEach((b, i) => {
+                b.position.add(b.userData.v);
+                enemies.forEach((en, ei) => {
+                    if(b.position.distanceTo(en.g.position) < 2) {
+                        scene.remove(en.g); en.dot.remove(); enemies.splice(ei, 1);
+                        scene.remove(b); pB.splice(i, 1);
+                        kills++; document.getElementById('p-kills').innerText = kills;
                     }
-                    if(b.position.y < -1 || b.position.distanceTo(player.position) > 150) { scene.remove(b); list.splice(i, 1); }
                 });
+                if(b.position.distanceTo(p.g.position) > 120) { scene.remove(b); pB.splice(i, 1); }
             });
 
-            document.getElementById('health-fill').style.width = playerHealth + "%";
-            if(playerHealth <= 0) { playerHealth = 100; serverKills++; updateChart(); }
+            eB.forEach((eb, i) => {
+                eb.position.add(eb.userData.v);
+                if(eb.position.distanceTo(p.g.position) < 1.6) {
+                    hp -= 10; scene.remove(eb); eB.splice(i, 1);
+                }
+                if(eb.position.distanceTo(p.g.position) > 120) { scene.remove(eb); eB.splice(i, 1); }
+            });
 
-            camera.position.set(player.position.x - Math.sin(camAngle)*camDist, 8, player.position.z - Math.cos(camAngle)*camDist);
-            camera.lookAt(player.position.x, player.position.y + 2, player.position.z);
+            document.getElementById('h-fill').style.width = hp + "%";
+            if(hp <= 0) { hp = 100; }
+
+            camera.position.set(p.g.position.x - Math.sin(cAng)*15, 9, p.g.position.z - Math.cos(cAng)*15);
+            camera.lookAt(p.g.position.x, p.g.position.y+2, p.g.position.z);
             renderer.render(scene, camera);
         }
         animate();
