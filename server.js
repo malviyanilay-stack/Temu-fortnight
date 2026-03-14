@@ -1,3 +1,16 @@
+const express = require('express');
+const app = express();
+const http = require('http');
+const server = http.createServer(app);
+const { Server } = require("socket.io");
+
+// This is the important part!
+const io = new Server(server, {
+  cors: {
+    origin: "*", // This allows ANY website (including your Vercel) to connect
+    methods: ["GET", "POST"]
+  }
+});
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server active on port ${PORT}`));
 const express = require('express');
