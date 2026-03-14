@@ -152,4 +152,24 @@
     </script>
 </body>
 </html>
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"// Prevent double-tap zoom
+document.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 1) {
+        e.preventDefault(); 
+    }
+}, { passive: false });
+
+// Prevent zooming via gestures
+document.addEventListener('gesturestart', (e) => {
+    e.preventDefault();
+});
+
+// Final check to ensure the viewport stays fixed
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => {
+    const now = (new Date()).getTime();
+    if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+    }
+    lastTouchEnd = now;
+}, false);></script>
