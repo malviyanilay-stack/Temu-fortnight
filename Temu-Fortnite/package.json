@@ -1,7 +1,7 @@
 {
   "name": "temu-fortnite",
   "version": "1.0.0",
-  "description": "Multiplayer WebGL PvE Shooter",
+  "description": "Multiplayer PvE Shooter",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
