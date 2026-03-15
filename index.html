@@ -3,280 +3,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Temu Fortnite: Render Edition</title>
+    <title>Temu Fortnite: Render Online</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    
     <style>
-        /* --- THE SAFARI ZOOM & BOUNCE KILLER --- */
-        html, body {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            overflow: hidden; position: fixed; 
-            touch-action: none; -webkit-overflow-scrolling: none;
-        }
-
+        /* --- SAFARI ANTI-ZOOM & SYSTEM LOCK --- */
         * { 
-            box-sizing: border-box; 
-            user-select: none; -webkit-user-select: none;
-            -webkit-tap-highlight-color: transparent; 
-            touch-action: none; 
+            margin: 0; padding: 0; box-sizing: border-box; 
+            touch-action: none; user-select: none; 
+            -webkit-user-select: none; -webkit-tap-highlight-color: transparent; 
         }
+        body { background: #000; overflow: hidden; position: fixed; width: 100%; height: 100%; }
+        #c { width: 100vw; height: 100vh; display: block; }
 
-        body { background: #87ceeb; font-family: 'Arial Black', sans-serif; }
-        #game-canvas { width: 100vw; height: 100vh; display: block; }
-
-        /* --- THE HUD --- */
-        #ui-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
-
+        /* UI HUD */
+        #ui { position: absolute; inset: 0; pointer-events: none; z-index: 100; color: #fff; font-family: 'Arial Black', sans-serif; }
+        
         #minimap { 
-            position: absolute; top: 20px; left: 20px; 
-            width: 140px; height: 140px; 
-            background: rgba(10, 30, 10, 0.85); 
-            border: 3px solid #00ffff; pointer-events: auto;
+            position: absolute; top: 20px; left: 20px; width: 140px; height: 140px; 
+            background: rgba(0,25,0,0.8); border: 3px solid #00ffff; pointer-events: auto;
         }
         .dot { position: absolute; width: 7px; height: 7px; border-radius: 50%; transform: translate(-50%, -50%); }
-        #p-dot { background: #fff; box-shadow: 0 0 10px #fff; z-index: 5; }
+        #p-dot { background: #fff; box-shadow: 0 0 10px #fff; z-index: 10; }
 
-        #leaderboard { 
-            position: absolute; top: 20px; right: 20px; 
-            background: rgba(0,0,0,0.85); padding: 12px; 
-            border-right: 5px solid #00ffff; color: #fff; text-align: right;
+        #stats { 
+            position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.8); 
+            padding: 15px; border-right: 6px solid #00ffff; text-align: right;
         }
-        .label { font-size: 10px; color: #00ffff; letter-spacing: 1px; }
-        .val { font-size: 24px; font-weight: 900; }
+        .stat-val { font-size: 26px; color: #00ffff; font-weight: 900; }
 
-        #hp-box { 
-            position: absolute; top: 180px; left: 20px; 
-            width: 220px; background: rgba(50,20,0,0.8); 
-            padding: 8px; border: 1px solid #ffaa00; 
+        #health-container { 
+            position: absolute; top: 180px; left: 20px; width: 220px; 
+            background: rgba(0,0,0,0.7); padding: 10px; border: 1px solid #ffaa00;
         }
-        #hp-bar-bg { width: 100%; height: 15px; background: #221100; }
-        #hp-bar-fill { width: 100%; height: 100%; background: #ffaa00; transition: width 0.2s; }
+        #h-bar { width: 100%; height: 16px; background: #ffaa00; transition: width 0.2s; }
 
-        /* --- CONTROLS --- */
+        /* JOYSTICK */
         #joy-base { 
-            position: absolute; bottom: 60px; left: 60px; 
-            width: 150px; height: 150px; 
-            background: rgba(255,255,255,0.05); border: 2px solid #00ffff55; border-radius: 50%; 
-            pointer-events: auto; 
+            position: absolute; bottom: 60px; left: 60px; width: 150px; height: 150px; 
+            background: rgba(255,255,255,0.05); border: 2px solid #00ffff66; border-radius: 50%; pointer-events: auto;
         }
         #joy-knob { 
-            position: absolute; width: 70px; height: 70px; 
-            background: #00ffff; border-radius: 50%; top: 40px; left: 40px; 
-            opacity: 0.8; box-shadow: 0 0 20px #00ffffaa;
+            position: absolute; width: 75px; height: 75px; background: #00ffff; 
+            border-radius: 50%; top: 37px; left: 37px; opacity: 0.9; box-shadow: 0 0 20px #00ffff;
         }
 
-        #action-btns { 
-            position: absolute; bottom: 60px; right: 60px; 
-            display: flex; flex-direction: column; gap: 20px; pointer-events: auto; 
+        /* ACTION BUTTONS */
+        #action-zone { 
+            position: absolute; bottom: 60px; right: 60px; display: flex; flex-direction: column; gap: 20px; pointer-events: auto;
         }
         .btn { 
-            width: 100px; height: 100px; border-radius: 50%; 
-            border: 4px solid #fff; background: rgba(0,0,0,0.7); 
-            color: #fff; display: flex; align-items: center; justify-content: center; 
-            font-weight: 900; font-size: 18px; 
+            width: 110px; height: 110px; border-radius: 50%; border: 4px solid #fff; 
+            background: rgba(0,0,0,0.6); color: #fff; display: flex; align-items: center; 
+            justify-content: center; font-weight: 900; font-size: 18px;
         }
-        #fire-btn { width: 130px; height: 130px; border-color: #ff3333; color: #ff3333; font-size: 24px; }
+        #fire-btn { 
+            width: 140px; height: 140px; border-color: #ff3333; color: #ff3333; font-size: 26px; 
+            box-shadow: 0 0 15px rgba(255,0,0,0.4);
+        }
 
-        #aim-catcher { position: absolute; top: 0; right: 0; width: 65%; height: 100%; pointer-events: auto; z-index: 1; }
+        #aim-catcher { position: absolute; top: 0; right: 0; width: 65%; height: 100%; pointer-events: auto; z-index: 10; }
     </style>
 </head>
 <body>
-    <div id="ui-layer">
+    <div id="ui">
         <div id="aim-catcher"></div>
         <div id="minimap"><div id="p-dot" class="dot" style="left:70px; top:70px;"></div></div>
-        
-        <div id="leaderboard">
-            <div class="label">ELIMINATIONS</div>
-            <div id="kill-count" class="val">0</div>
-            <div style="height:8px"></div>
-            <div class="label">PING</div>
-            <div id="ping-val" class="val">--</div>
+        <div id="stats">
+            <div style="font-size: 10px;">ELIMINATIONS</div>
+            <div id="k-count" class="stat-val">0</div>
         </div>
-
-        <div id="hp-box">
-            <div class="label" style="margin-bottom:5px; color:#ffaa00">HEALTH</div>
-            <div id="hp-bar-bg"><div id="hp-bar-fill"></div></div>
+        <div id="health-container">
+            <div style="font-size: 10px; color:#ffaa00; margin-bottom: 5px;">HEALTH</div>
+            <div style="background:#200; height:16px;"><div id="h-bar"></div></div>
         </div>
-
         <div id="joy-base"><div id="joy-knob"></div></div>
-        <div id="action-btns">
+        <div id="action-zone">
             <div id="fire-btn" class="btn">FIRE</div>
             <div id="jump-btn" class="btn">JUMP</div>
         </div>
     </div>
-    <canvas id="game-canvas"></canvas>
+    <canvas id="c"></canvas>
 
     <script>
-        /**
-         * TEMU FORTNITE ONLINE - FULL FORCE v10
-         * REPL/RENDER MULTIPLAYER SYNC
-         */
-
-        // 1. CONNECT TO YOUR RENDER SERVER
-        // REPLACE THIS URL WITH YOUR ACTUAL RENDER LINK!
-        const SERVER_URL = "https://temu-fortnight.onrender.com"; 
-        const socket = io(SERVER_URL);
-
-        const CONFIG = {
-            WORLD_SIZE: 1200,
-            PLAYER_HP: 100,
-            COLORS: { PLAYER: 0x0000ff, ENEMY: 0xff0000, SKIN: 0xffdbac }
-        };
-
-        // --- GLOBAL STATE ---
+        // --- 1. NETWORKING ---
+        const socket = io("https://temu-fortnight.onrender.com/");
         let myId = null;
-        let remotePlayers = {};
+        let remotes = {};
+        let enemies = {};
         let bullets = [];
-        let enemies = [];
 
-        // --- ENGINE SETUP ---
+        // --- 2. ENGINE ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87ceeb);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1500);
-        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game-canvas'), antialias: false });
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        // --- ASSET FACTORY ---
-        class AssetMaker {
-            static createCharacter(color) {
-                const group = new THREE.Group();
-                const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 0.6), new THREE.MeshStandardMaterial({color}));
-                body.position.y = 0.9;
-                const head = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.75, 0.75), new THREE.MeshStandardMaterial({color: CONFIG.COLORS.SKIN}));
-                head.position.y = 2.15;
-                group.add(body, head);
-                return group;
-            }
-            static createTree() {
-                const g = new THREE.Group();
-                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 3), new THREE.MeshStandardMaterial({color: 0x4a2e19}));
-                trunk.position.y = 1.5;
-                const leaves = new THREE.Mesh(new THREE.ConeGeometry(2.5, 6, 6), new THREE.MeshStandardMaterial({color: 0x2d4d1f}));
-                leaves.position.y = 5;
-                g.add(trunk, leaves);
-                return g;
-            }
+        // --- 3. CHARACTER MAKER (Anti-Cube Fix) ---
+        function createMan(color) {
+            const group = new THREE.Group();
+            // The Body
+            const body = new THREE.Mesh(
+                new THREE.BoxGeometry(1.1, 1.8, 0.6), 
+                new THREE.MeshStandardMaterial({ color })
+            );
+            body.position.y = 0.9;
+            // The Head (Skin color)
+            const head = new THREE.Mesh(
+                new THREE.BoxGeometry(0.75, 0.75, 0.75), 
+                new THREE.MeshStandardMaterial({ color: 0xffdbac })
+            );
+            head.position.y = 2.15;
+            group.add(body, head);
+            return group;
         }
 
-        // --- WORLD GEN ---
-        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-        const sun = new THREE.DirectionalLight(0xffffff, 0.4);
-        sun.position.set(10, 50, 10);
-        scene.add(sun);
-
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.MeshStandardMaterial({color: 0x5d994d}));
+        // --- 4. WORLD BUILDING ---
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(2000, 2000), 
+            new THREE.MeshStandardMaterial({ color: 0x5d994d })
+        );
         floor.rotation.x = -Math.PI/2;
         scene.add(floor);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.85));
 
-        for(let i=0; i<50; i++) {
-            const tree = AssetMaker.createTree();
-            tree.position.set((Math.random()-0.5)*800, 0, (Math.random()-0.5)*800);
-            scene.add(tree);
-        }
-
-        // --- PLAYER & INPUTS ---
-        const player = AssetMaker.createCharacter(CONFIG.COLORS.PLAYER);
-        const gun = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 1.2), new THREE.MeshStandardMaterial({color: 0x222}));
-        gun.position.set(0.6, 1.4, -0.4);
-        player.add(gun);
+        // --- 5. PLAYER ---
+        const player = createMan(0x0000ff); // Local player is Blue
         scene.add(player);
 
-        let move = { x: 0, y: 0 };
-        let aim = { dx: 0, id: null, lastX: 0 };
-        let camRot = 0;
-        let lastTap = 0;
-
-        // --- MULTIPLAYER LISTENERS ---
-        socket.on('connect', () => { myId = socket.id; console.log("Connected!"); });
-        
-        socket.on('state', (serverPlayers) => {
-            Object.keys(serverPlayers).forEach(id => {
-                if(id === myId) return;
-                if(!remotePlayers[id]) {
-                    remotePlayers[id] = AssetMaker.createCharacter(0xffffff); // Remote players are white
-                    scene.add(remotePlayers[id]);
-                }
-                const p = serverPlayers[id];
-                remotePlayers[id].position.set(p.x, p.y, p.z);
-                remotePlayers[id].rotation.y = p.r + Math.PI;
-            });
-        });
-
-        socket.on('playerLeave', id => {
-            if(remotePlayers[id]) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; }
-        });
-
-        // --- INPUT BINDINGS (SAFARI PROTECTED) ---
-        const joyBase = document.getElementById('joy-base');
-        const joyKnob = document.getElementById('joy-knob');
-        const aimCatcher = document.getElementById('aim-catcher');
+        // --- 6. CONTROLS & SAFARI LOCK ---
+        let move = {x:0, y:0}, look = {dx:0, id:null, lastX:0}, angle = 0, lastTap = 0;
 
         const handleJoy = (e) => {
-            const r = joyBase.getBoundingClientRect();
+            const r = document.getElementById('joy-base').getBoundingClientRect();
             const t = e.touches[0];
-            let dx = (t.clientX - (r.left + r.width/2)) / 75;
-            let dy = (t.clientY - (r.top + r.height/2)) / 75;
+            let dx = (t.clientX - (r.left + r.width/2))/75;
+            let dy = (t.clientY - (r.top + r.height/2))/75;
             const d = Math.sqrt(dx*dx+dy*dy);
             if(d > 1) { dx/=d; dy/=d; }
-            move = { x: dx, y: dy };
-            joyKnob.style.transform = `translate(${dx*50}px, ${dy*50}px)`;
+            move = {x:dx, y:dy};
+            document.getElementById('joy-knob').style.transform = `translate(${dx*50}px, ${dy*50}px)`;
         };
 
-        joyBase.addEventListener('touchstart', handleJoy);
-        joyBase.addEventListener('touchmove', handleJoy);
-        joyBase.addEventListener('touchend', () => { move={x:0,y:0}; joyKnob.style.transform=`translate(0,0)`; });
-
-        aimCatcher.addEventListener('touchstart', e => {
-            const t = e.changedTouches[0];
-            if(!aim.id) { aim.id = t.identifier; aim.lastX = t.clientX; }
+        document.getElementById('joy-base').addEventListener('touchstart', handleJoy);
+        document.getElementById('joy-base').addEventListener('touchmove', handleJoy);
+        document.getElementById('joy-base').addEventListener('touchend', () => {
+            move = {x:0, y:0};
+            document.getElementById('joy-knob').style.transform = `translate(0,0)`;
         });
-        aimCatcher.addEventListener('touchmove', e => {
+
+        document.getElementById('aim-catcher').addEventListener('touchstart', e => {
+            const t = e.changedTouches[0];
+            if(!look.id) { look.id = t.identifier; look.lastX = t.clientX; }
+        });
+        document.getElementById('aim-catcher').addEventListener('touchmove', e => {
             for(let t of e.changedTouches) {
-                if(t.identifier === aim.id) {
-                    aim.dx = t.clientX - aim.lastX;
-                    aim.lastX = t.clientX;
+                if(t.identifier === look.id) {
+                    look.dx = t.clientX - look.lastX;
+                    look.lastX = t.clientX;
                 }
             }
         });
-        aimCatcher.addEventListener('touchend', e => {
-            for(let t of e.changedTouches) if(t.identifier === aim.id) aim.id = null;
-        });
 
+        // SAFARI LOCK
         document.addEventListener('touchend', e => {
             const now = Date.now();
             if(now - lastTap < 300) e.preventDefault();
             lastTap = now;
-        }, {passive: false});
+        }, { passive: false });
 
-        // --- GAME LOOP ---
-        function animate() {
-            requestAnimationFrame(animate);
+        // --- 7. FIRE LOGIC ---
+        function fire() {
+            const dir = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+            const b = new THREE.Mesh(new THREE.SphereGeometry(0.22), new THREE.MeshBasicMaterial({color: 0x00ffff}));
+            b.position.copy(player.position).add(new THREE.Vector3(0, 1.5, 0));
+            bullets.push({ m: b, v: dir.multiplyScalar(2.8), life: 100 });
+            scene.add(b);
+            socket.emit('shoot', { pos: player.position, dir });
+        }
+        document.getElementById('fire-btn').addEventListener('touchstart', fire);
 
-            // 1. Rotation & Movement
-            camRot -= aim.dx * 0.008; aim.dx = 0;
-            player.rotation.y = camRot + Math.PI;
+        // --- 8. SYNC ---
+        socket.on('init', data => {
+            myId = data.id;
+            Object.keys(data.enemies).forEach(id => spawnEnemyMesh(data.enemies[id]));
+        });
 
-            const fwd = new THREE.Vector3(Math.sin(camRot), 0, Math.cos(camRot));
-            const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), fwd);
-            player.position.x += (fwd.x * -move.y * 0.35) + (side.x * -move.x * 0.35);
-            player.position.z += (fwd.z * -move.y * 0.35) + (side.z * -move.x * 0.35);
+        socket.on('state', data => {
+            Object.keys(data.players).forEach(id => {
+                if(id === socket.id) return;
+                if(!remotes[id]) {
+                    remotes[id] = createMan(0xeeeeee);
+                    scene.add(remotes[id]);
+                }
+                const p = data.players[id];
+                remotes[id].position.set(p.x, 0, p.z);
+                remotes[id].rotation.y = p.r + Math.PI;
+            });
+        });
 
-            // 2. Camera Rig
-            camera.position.set(player.position.x - Math.sin(camRot)*18, 11, player.position.z - Math.cos(camRot)*18);
-            camera.lookAt(player.position.x, 2, player.position.z);
-
-            // 3. Network Sync
-            if(socket.connected) {
-                socket.emit('move', { x: player.position.x, y: player.position.y, z: player.position.z, r: camRot });
+        function spawnEnemyMesh(data) {
+            if(!enemies[data.id]) {
+                enemies[data.id] = createMan(0xff0000);
+                enemies[data.id].position.set(data.x, 0, data.z);
+                scene.add(enemies[data.id]);
             }
+        }
+        socket.on('spawnEnemy', data => spawnEnemyMesh(data));
 
+        socket.on('playerLeave', id => {
+            if(remotes[id]) { scene.remove(remotes[id]); delete remotes[id]; }
+        });
+
+        // --- 9. LOOP ---
+        function loop() {
+            requestAnimationFrame(loop);
+            
+            angle -= look.dx * 0.008; look.dx = 0;
+            player.rotation.y = angle + Math.PI;
+
+            const f = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+            const s = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), f);
+            player.position.x += (f.x * -move.y * 0.38) + (s.x * -move.x * 0.38);
+            player.position.z += (f.z * -move.y * 0.38) + (s.z * -move.x * 0.38);
+
+            socket.emit('move', { x: player.position.x, z: player.position.z, r: angle });
+
+            bullets.forEach((b, i) => {
+                b.m.position.add(b.v);
+                if(--b.life <= 0) { scene.remove(b.m); bullets.splice(i,1); }
+            });
+
+            camera.position.set(player.position.x - Math.sin(angle)*18, 11, player.position.z - Math.cos(angle)*18);
+            camera.lookAt(player.position.x, 2, player.position.z);
             renderer.render(scene, camera);
         }
-
-        animate();
+        loop();
     </script>
 </body>
 </html>
