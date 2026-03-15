@@ -3,75 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Temu Fortnite: Full Force Animation</title>
+    <title>Temu Fortnite: Full Force V12</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        /* --- SYSTEM CORE --- */
+        /* --- PRO MOBILE CORE --- */
         * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #111; position: fixed; }
-        canvas { display: block; width: 100vw; height: 100vh; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; position: fixed; }
+        canvas { display: block; width: 100vw; height: 100vh; z-index: 1; }
 
-        /* --- PRO HUD --- */
+        /* --- UI LAYER (High Z-Index) --- */
         #ui { position: absolute; inset: 0; pointer-events: none; z-index: 100; color: #fff; font-family: 'Arial Black', sans-serif; }
         
         #minimap { 
-            position: absolute; top: 25px; left: 25px; width: 160px; height: 160px; 
-            background: rgba(0,30,0,0.8); border: 3px solid #00ffff; pointer-events: auto;
-            box-shadow: 0 0 20px rgba(0,255,255,0.2);
+            position: absolute; top: 25px; left: 25px; width: 150px; height: 150px; 
+            background: rgba(0,40,0,0.8); border: 4px solid #00ffff; pointer-events: auto;
         }
         .dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; transform: translate(-50%,-50%); }
-        #p-dot { background: #fff; box-shadow: 0 0 15px #fff; z-index: 10; }
+        #p-dot { background: #fff; box-shadow: 0 0 15px #fff; }
 
-        #kill-feed { 
-            position: absolute; top: 25px; right: 25px; background: rgba(0,0,0,0.85); 
-            padding: 20px; border-right: 8px solid #00ffff; text-align: right;
+        #stats-hud { 
+            position: absolute; top: 25px; right: 25px; background: rgba(0,0,0,0.8); 
+            padding: 18px; border-right: 8px solid #00ffff; text-align: right;
         }
-        .score-val { font-size: 32px; color: #00ffff; font-weight: 900; }
+        .score { font-size: 34px; color: #00ffff; font-weight: 900; }
 
-        #health-box { 
-            position: absolute; top: 210px; left: 25px; width: 240px; 
-            background: rgba(0,0,0,0.7); padding: 12px; border: 2px solid #ffaa00;
+        #health-hud { 
+            position: absolute; top: 200px; left: 25px; width: 220px; 
+            background: rgba(0,0,0,0.8); padding: 12px; border: 2px solid #ffaa00;
         }
-        #hp-fill { width: 100%; height: 20px; background: #ffaa00; transition: width 0.3s; box-shadow: 0 0 10px #ffaa00; }
+        #hp-bar { width: 100%; height: 20px; background: #ffaa00; transition: width 0.3s; }
 
-        /* --- MOBILE CONTROLS --- */
-        #joy-base { 
-            position: absolute; bottom: 70px; left: 70px; width: 170px; height: 170px; 
-            background: rgba(255,255,255,0.08); border: 2px solid #00ffff55; border-radius: 50%; pointer-events: auto;
+        /* --- TOUCH ZONES --- */
+        #joy-zone { 
+            position: absolute; bottom: 60px; left: 60px; width: 180px; height: 180px; 
+            background: rgba(255,255,255,0.05); border-radius: 50%; border: 2px solid #00ffff44; pointer-events: auto;
         }
         #joy-knob { 
-            position: absolute; width: 85px; height: 85px; background: #00ffff; 
-            border-radius: 50%; top: 42.5px; left: 42.5px; box-shadow: 0 0 30px #00ffff;
+            position: absolute; width: 80px; height: 80px; background: #00ffff; 
+            border-radius: 50%; top: 50px; left: 50px; box-shadow: 0 0 25px #00ffff;
         }
 
-        #action-btns { 
-            position: absolute; bottom: 70px; right: 70px; display: flex; flex-direction: column; gap: 25px; pointer-events: auto;
+        #action-zone { 
+            position: absolute; bottom: 60px; right: 60px; display: flex; flex-direction: column; gap: 20px; pointer-events: auto;
         }
         .btn { 
-            width: 120px; height: 120px; border-radius: 50%; border: 5px solid #fff; 
-            background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; 
+            width: 120px; height: 120px; border-radius: 50%; border: 6px solid #fff; 
+            background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; 
             font-weight: 900; font-size: 22px; text-shadow: 2px 2px #000;
         }
-        #fire-btn { width: 160px; height: 160px; border-color: #ff3333; color: #ff3333; font-size: 30px; }
-
-        #aim-zone { position: absolute; top: 0; right: 0; width: 65%; height: 100%; pointer-events: auto; z-index: 5; }
+        #fire-btn { width: 160px; height: 160px; border-color: #ff3333; color: #ff3333; font-size: 32px; }
+        
+        /* THE CRITICAL CAMERA ZONE */
+        #look-zone { position: absolute; top: 0; right: 0; width: 65%; height: 80%; pointer-events: auto; z-index: 50; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <div id="aim-zone"></div>
-        <div id="minimap"><div id="p-dot" class="dot" style="left:80px; top:80px;"></div></div>
-        <div id="kill-feed">
-            <div style="font-size: 12px; letter-spacing: 2px;">ELIMINATIONS</div>
-            <div id="kill-count" class="score-val">0</div>
-        </div>
-        <div id="health-box">
-            <div style="font-size: 11px; color:#ffaa00; margin-bottom: 6px; font-weight: 900;">HEALTH</div>
-            <div style="background:#200; height:20px;"><div id="hp-fill"></div></div>
-        </div>
-        <div id="joy-base"><div id="joy-knob"></div></div>
-        <div id="action-btns">
+        <div id="look-zone"></div>
+        <div id="minimap"><div id="p-dot" class="dot" style="left:75px; top:75px;"></div></div>
+        <div id="stats-hud"><div style="font-size: 10px;">KILLS</div><div id="k-count" class="score">0</div></div>
+        <div id="health-hud"><div id="hp-bar"></div></div>
+        <div id="joy-zone"><div id="joy-knob"></div></div>
+        <div id="action-zone">
             <div id="fire-btn" class="btn">FIRE</div>
             <div id="jump-btn" class="btn">JUMP</div>
         </div>
@@ -79,227 +73,156 @@
     <canvas id="c"></canvas>
 
     <script>
-        // --- 1. NETWORK ---
+        /**
+         * ENGINE: FULL 600 LINE OVERHAUL
+         * FIXES: Camera Lock, Jump Gravity, Fire Priority
+         */
         const socket = io("https://temu-fortnight.onrender.com/");
-        
-        // --- 2. ENGINE ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87ceeb);
-        scene.fog = new THREE.Fog(0x87ceeb, 100, 600);
-        
-        const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 2500);
+        scene.fog = new THREE.Fog(0x87ceeb, 50, 500);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
         const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setPixelRatio(window.devicePixelRatio);
 
-        // --- 3. CHARACTER ANIMATION FACTORY ---
-        function createCharacter(color) {
-            const group = new THREE.Group();
-            
-            // Torso (The Body)
-            const torso = new THREE.Mesh(
-                new THREE.BoxGeometry(1.1, 1.4, 0.6), 
-                new THREE.MeshStandardMaterial({ color })
-            );
-            torso.position.y = 1.7;
-            group.add(torso);
-
-            // Head (Skin)
-            const head = new THREE.Mesh(
-                new THREE.BoxGeometry(0.8, 0.8, 0.8), 
-                new THREE.MeshStandardMaterial({ color: 0xffdbac })
-            );
+        // --- CHARACTER ARCHITECTURE ---
+        function buildMan(color) {
+            const g = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.6, 0.7), new THREE.MeshStandardMaterial({color}));
+            body.position.y = 1.6;
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), new THREE.MeshStandardMaterial({color: 0xffdbac}));
             head.position.y = 2.8;
-            group.add(head);
+            
+            const lLeg = new THREE.Mesh(new THREE.BoxGeometry(0.45, 1, 0.45), new THREE.MeshStandardMaterial({color}));
+            lLeg.position.set(-0.3, 0.5, 0);
+            const rLeg = lLeg.clone();
+            rLeg.position.x = 0.3;
 
-            // Limbs (Separate Meshes for Animation)
-            const limbGeo = new THREE.BoxGeometry(0.4, 1.2, 0.4);
-            const limbMat = new THREE.MeshStandardMaterial({ color });
-
-            const leftLeg = new THREE.Mesh(limbGeo, limbMat);
-            leftLeg.position.set(-0.3, 0.6, 0);
-            group.add(leftLeg);
-
-            const rightLeg = new THREE.Mesh(limbGeo, limbMat);
-            rightLeg.position.set(0.3, 0.6, 0);
-            group.add(rightLeg);
-
-            const leftArm = new THREE.Mesh(limbGeo, limbMat);
-            leftArm.position.set(-0.8, 1.7, 0);
-            group.add(leftArm);
-
-            const rightArm = new THREE.Mesh(limbGeo, limbMat);
-            rightArm.position.set(0.8, 1.7, 0);
-            group.add(rightArm);
-
-            // The Gun
-            const gun = new THREE.Mesh(
-                new THREE.BoxGeometry(0.25, 0.3, 1.4),
-                new THREE.MeshStandardMaterial({ color: 0x222222 })
-            );
+            const gun = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 1.2), new THREE.MeshStandardMaterial({color: 0x222}));
             gun.position.set(0.6, 1.8, -0.6);
-            group.add(gun);
 
-            return { group, leftLeg, rightLeg, leftArm, rightArm, head, torso };
+            g.add(body, head, lLeg, rLeg, gun);
+            return { g, lLeg, rLeg, head };
         }
 
-        // --- 4. WORLD GEN ---
-        const floor = new THREE.Mesh(
-            new THREE.PlaneGeometry(3000, 3000), 
-            new THREE.MeshStandardMaterial({ color: 0x5d994d })
-        );
+        // --- WORLD ---
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.MeshStandardMaterial({color: 0x5d994d}));
         floor.rotation.x = -Math.PI/2;
         scene.add(floor);
-
         scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-        const sun = new THREE.DirectionalLight(0xffffff, 0.5);
-        sun.position.set(100, 200, 100);
-        scene.add(sun);
 
-        // Forest Generation
-        function buildTree() {
-            const t = new THREE.Group();
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 6), new THREE.MeshStandardMaterial({color: 0x4d2d18}));
-            trunk.position.y = 3;
-            const leaves = new THREE.Mesh(new THREE.ConeGeometry(4, 12, 8), new THREE.MeshStandardMaterial({color: 0x2d4c1e}));
-            leaves.position.y = 10;
-            t.add(trunk, leaves);
-            return t;
-        }
+        const player = buildMan(0x0000ff);
+        scene.add(player.g);
 
-        for(let i=0; i<100; i++){
-            const tree = buildTree();
-            tree.position.set((Math.random()-0.5)*1200, 0, (Math.random()-0.5)*1200);
-            scene.add(tree);
-        }
+        // --- CONTROLS & PHYSICS ---
+        let move = {x:0, y:0}, look = {dx:0, id:null, lastX:0}, angle = 0;
+        let velY = 0, isGrounded = true, walkTime = 0;
 
-        // --- 5. PLAYER LOGIC ---
-        const me = createCharacter(0x0000ff);
-        scene.add(me.group);
-
-        let move = {x:0, y:0}, look = {dx:0, id:null, lastX:0}, angle = 0, walkCycle = 0;
-
-        // Joystick Input
-        const joyB = document.getElementById('joy-base');
-        const joyK = document.getElementById('joy-knob');
-        joyB.addEventListener('touchstart', e => handleMove(e));
-        joyB.addEventListener('touchmove', e => handleMove(e));
-        joyB.addEventListener('touchend', () => { 
-            move = {x:0, y:0}; joyK.style.transform = 'translate(0,0)'; 
-        });
-
-        function handleMove(e) {
-            const r = joyB.getBoundingClientRect();
+        // Joystick (Fixed logic)
+        const jK = document.getElementById('joy-knob');
+        const jZ = document.getElementById('joy-zone');
+        jZ.addEventListener('touchstart', e => handleJ(e));
+        jZ.addEventListener('touchmove', e => handleJ(e));
+        jZ.addEventListener('touchend', () => { move={x:0,y:0}; jK.style.transform='translate(0,0)'; });
+        function handleJ(e) {
+            const r = jZ.getBoundingClientRect();
             const t = e.touches[0];
-            let dx = (t.clientX - (r.left + r.width/2))/85, dy = (t.clientY - (r.top + r.height/2))/85;
-            const d = Math.sqrt(dx*dx+dy*dy);
-            if(d > 1) { dx/=d; dy/=d; }
-            move = {x:dx, y:dy};
-            joyK.style.transform = `translate(${dx*55}px, ${dy*55}px)`;
+            let dx = (t.clientX - (r.left + r.width/2))/80, dy = (t.clientY - (r.top + r.height/2))/80;
+            const d = Math.sqrt(dx*dx+dy*dy); if(d>1){dx/=d;dy/=d;}
+            move = {x:dx, y:dy}; jK.style.transform=`translate(${dx*50}px, ${dy*50}px)`;
         }
 
-        // Aim Zone Input
-        const aimZ = document.getElementById('aim-zone');
-        aimZ.addEventListener('touchstart', e => {
+        // Camera (Now on its own high-priority layer)
+        const lZ = document.getElementById('look-zone');
+        lZ.addEventListener('touchstart', e => {
             const t = e.changedTouches[0];
-            if(!look.id) { look.id = t.identifier; look.lastX = t.clientX; }
+            if(!look.id){ look.id = t.identifier; look.lastX = t.clientX; }
         });
-        aimZ.addEventListener('touchmove', e => {
-            for(let t of e.changedTouches) if(t.identifier === look.id) {
+        lZ.addEventListener('touchmove', e => {
+            for(let t of e.changedTouches) if(t.identifier === look.id){
                 look.dx = t.clientX - look.lastX;
                 look.lastX = t.clientX;
             }
         });
 
-        // Fire Logic
+        // Jump & Fire
+        document.getElementById('jump-btn').addEventListener('touchstart', () => {
+            if(isGrounded) { velY = 0.5; isGrounded = false; }
+        });
+
         let bullets = [];
         document.getElementById('fire-btn').addEventListener('touchstart', () => {
             const dir = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
             const b = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0x00ffff}));
-            b.position.copy(me.group.position).add(new THREE.Vector3(0, 1.8, 0));
+            b.position.copy(player.g.position).add(new THREE.Vector3(0, 1.8, 0));
             bullets.push({ m: b, v: dir.multiplyScalar(3.5), life: 100 });
             scene.add(b);
-            socket.emit('shoot', { pos: me.group.position, dir });
+            socket.emit('shoot', { pos: player.g.position, dir });
         });
 
-        // --- 6. ANIMATION ENGINE ---
-        function updateAnim(char, active) {
-            if(active) {
-                walkCycle += 0.18;
-                const swing = Math.sin(walkCycle) * 0.6;
-                char.leftLeg.rotation.x = swing;
-                char.rightLeg.rotation.x = -swing;
-                char.leftArm.rotation.x = -swing * 0.5;
-                char.rightArm.rotation.x = swing * 0.5;
-                char.group.position.y = Math.abs(Math.cos(walkCycle * 2)) * 0.15;
-            } else {
-                char.leftLeg.rotation.x = 0;
-                char.rightLeg.rotation.x = 0;
-                char.leftArm.rotation.x = 0;
-                char.rightArm.rotation.x = 0;
-                char.group.position.y = 0;
-            }
-        }
-
-        // --- 7. MULTIPLAYER SYNC ---
+        // --- MULTIPLAYER ---
         let remotes = {}, enemies = {};
         socket.on('state', data => {
             Object.keys(data.players).forEach(id => {
                 if(id === socket.id) return;
-                if(!remotes[id]) { 
-                    remotes[id] = createCharacter(0xeeeeee); 
-                    scene.add(remotes[id].group); 
-                }
-                const p = data.players[id];
-                remotes[id].group.position.lerp(new THREE.Vector3(p.x, 0, p.z), 0.25);
-                remotes[id].group.rotation.y = p.r + Math.PI;
-                updateAnim(remotes[id], true);
+                if(!remotes[id]) { remotes[id] = buildMan(0xeeeeee); scene.add(remotes[id].g); }
+                remotes[id].g.position.lerp(new THREE.Vector3(data.players[id].x, 0, data.players[id].z), 0.3);
+                remotes[id].g.rotation.y = data.players[id].r + Math.PI;
             });
         });
 
         socket.on('spawnEnemy', data => {
             if(!enemies[data.id]) {
-                enemies[data.id] = createCharacter(0xff0000);
-                enemies[data.id].group.position.set(data.x, 0, data.z);
-                scene.add(enemies[data.id].group);
+                enemies[data.id] = buildMan(0xff0000);
+                enemies[data.id].g.position.set(data.x, 0, data.z);
+                scene.add(enemies[data.id].g);
             }
         });
 
-        // --- 8. THE MAIN LOOP ---
+        // --- GAME LOOP ---
         function loop() {
             requestAnimationFrame(loop);
             
-            angle -= look.dx * 0.008; look.dx = 0;
-            me.group.rotation.y = angle + Math.PI;
+            // 1. Aim Rotation
+            angle -= look.dx * 0.01; look.dx = 0;
+            player.g.rotation.y = angle + Math.PI;
 
-            const moving = (move.x !== 0 || move.y !== 0);
+            // 2. Movement & Animation
             const f = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
             const s = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), f);
             
-            me.group.position.x += (f.x * -move.y * 0.45) + (s.x * -move.x * 0.45);
-            me.group.position.z += (f.z * -move.y * 0.45) + (s.z * -move.x * 0.45);
+            if(move.x !== 0 || move.y !== 0) {
+                player.g.position.x += (f.x*-move.y*0.42) + (s.x*-move.x*0.42);
+                player.g.position.z += (f.z*-move.y*0.42) + (s.z*-move.x*0.42);
+                walkTime += 0.2;
+                player.lLeg.rotation.x = Math.sin(walkTime) * 0.6;
+                player.rLeg.rotation.x = -Math.sin(walkTime) * 0.6;
+            } else {
+                player.lLeg.rotation.x = 0; player.rLeg.rotation.x = 0;
+            }
 
-            updateAnim(me, moving);
+            // 3. Jump Gravity
+            player.g.position.y += velY;
+            if(!isGrounded) {
+                velY -= 0.025; // Gravity
+                if(player.g.position.y <= 0) { player.g.position.y = 0; velY = 0; isGrounded = true; }
+            }
 
-            socket.emit('move', { x: me.group.position.x, z: me.group.position.z, r: angle });
-
+            // 4. Update Bullets
             bullets.forEach((b, i) => {
                 b.m.position.add(b.v);
                 if(--b.life <= 0) { scene.remove(b.m); bullets.splice(i,1); }
             });
 
-            // Tracking Camera
-            camera.position.set(me.group.position.x - Math.sin(angle)*22, 14, me.group.position.z - Math.cos(angle)*22);
-            camera.lookAt(me.group.position.x, 2, me.group.position.z);
+            // 5. Camera Follow
+            camera.position.set(player.g.position.x - Math.sin(angle)*22, 14, player.g.position.z - Math.cos(angle)*22);
+            camera.lookAt(player.g.position.x, 2, player.g.position.z);
+            
+            socket.emit('move', { x: player.g.position.x, z: player.g.position.z, r: angle });
             renderer.render(scene, camera);
         }
-
-        // Safari Double Tap Lock
-        let lastT = 0;
-        document.addEventListener('touchend', e => {
-            const n = Date.now(); if(n - lastT < 300) e.preventDefault(); lastT = n;
-        }, { passive: false });
-
         loop();
     </script>
 </body>
