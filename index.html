@@ -3,602 +3,280 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Temu fortnite</title>
+    <title>Temu Fortnite: Render Edition</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     
     <style>
-        /* STRICT MOBILE RESET 
-           - Prevents Safari text-magnification
-           - Disables double-tap to zoom
-           - Kills tap-highlight ghosting
-        */
+        /* --- THE SAFARI ZOOM & BOUNCE KILLER --- */
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; position: fixed; 
+            touch-action: none; -webkit-overflow-scrolling: none;
+        }
+
         * { 
-            margin: 0; 
-            padding: 0; 
             box-sizing: border-box; 
-            touch-action: none; 
-            user-select: none; 
-            -webkit-user-select: none;
+            user-select: none; -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent; 
+            touch-action: none; 
         }
 
-        body { 
-            background: #000; 
-            overflow: hidden; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
+        body { background: #87ceeb; font-family: 'Arial Black', sans-serif; }
         #game-canvas { width: 100vw; height: 100vh; display: block; }
 
-        /* --- HUD ELEMENTS --- */
-        #ui-layer { 
-            position: absolute; 
-            inset: 0; 
-            pointer-events: none; 
-            z-index: 10; 
-        }
+        /* --- THE HUD --- */
+        #ui-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
 
         #minimap { 
-            position: absolute; 
-            top: 20px; 
-            left: 20px; 
-            width: 140px; 
-            height: 140px; 
+            position: absolute; top: 20px; left: 20px; 
+            width: 140px; height: 140px; 
             background: rgba(10, 30, 10, 0.85); 
-            border: 2px solid #00ffff; 
-            border-radius: 4px;
-            pointer-events: auto;
-            overflow: hidden;
+            border: 3px solid #00ffff; pointer-events: auto;
         }
+        .dot { position: absolute; width: 7px; height: 7px; border-radius: 50%; transform: translate(-50%, -50%); }
+        #p-dot { background: #fff; box-shadow: 0 0 10px #fff; z-index: 5; }
 
-        .dot { 
-            position: absolute; 
-            width: 6px; 
-            height: 6px; 
-            border-radius: 50%; 
-            transform: translate(-50%, -50%); 
+        #leaderboard { 
+            position: absolute; top: 20px; right: 20px; 
+            background: rgba(0,0,0,0.85); padding: 12px; 
+            border-right: 5px solid #00ffff; color: #fff; text-align: right;
         }
-        #p-dot { background: #fff; box-shadow: 0 0 8px #fff; z-index: 5; }
+        .label { font-size: 10px; color: #00ffff; letter-spacing: 1px; }
+        .val { font-size: 24px; font-weight: 900; }
 
-        #stat-card { 
-            position: absolute; 
-            top: 20px; 
-            right: 20px; 
-            background: linear-gradient(90deg, transparent, rgba(0,0,0,0.8));
-            padding: 15px 25px; 
-            border-right: 4px solid #00ffff;
-            text-align: right;
-            color: #fff;
+        #hp-box { 
+            position: absolute; top: 180px; left: 20px; 
+            width: 220px; background: rgba(50,20,0,0.8); 
+            padding: 8px; border: 1px solid #ffaa00; 
         }
-        .stat-label { font-size: 10px; letter-spacing: 2px; color: #aaa; }
-        .stat-value { font-size: 22px; font-weight: 900; color: #00ffff; }
-
-        #health-section { 
-            position: absolute; 
-            bottom: 40px; 
-            left: 50%; 
-            transform: translateX(-50%); 
-            width: 250px; 
-            text-align: center;
-        }
-        .h-tag { font-size: 11px; color: #ffaa00; font-weight: bold; margin-bottom: 5px; }
-        #h-frame { width: 100%; height: 16px; background: rgba(50,20,0,0.6); border: 1px solid #ffaa00; border-radius: 2px; }
-        #h-bar { width: 100%; height: 100%; background: #ffaa00; transition: width 0.3s cubic-bezier(0.17, 0.67, 0.83, 0.67); }
+        #hp-bar-bg { width: 100%; height: 15px; background: #221100; }
+        #hp-bar-fill { width: 100%; height: 100%; background: #ffaa00; transition: width 0.2s; }
 
         /* --- CONTROLS --- */
         #joy-base { 
-            position: absolute; 
-            bottom: 50px; 
-            left: 50px; 
-            width: 150px; 
-            height: 150px; 
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); 
-            border: 2px solid rgba(0,255,255,0.2); 
-            border-radius: 50%; 
+            position: absolute; bottom: 60px; left: 60px; 
+            width: 150px; height: 150px; 
+            background: rgba(255,255,255,0.05); border: 2px solid #00ffff55; border-radius: 50%; 
             pointer-events: auto; 
         }
         #joy-knob { 
-            position: absolute; 
-            width: 60px; 
-            height: 60px; 
-            background: #00ffff; 
-            border-radius: 50%; 
-            top: 45px; 
-            left: 45px; 
-            opacity: 0.6;
-            box-shadow: 0 0 15px rgba(0,255,255,0.5);
+            position: absolute; width: 70px; height: 70px; 
+            background: #00ffff; border-radius: 50%; top: 40px; left: 40px; 
+            opacity: 0.8; box-shadow: 0 0 20px #00ffffaa;
         }
 
-        #btn-group { 
-            position: absolute; 
-            bottom: 50px; 
-            right: 50px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 20px; 
-            pointer-events: auto; 
+        #action-btns { 
+            position: absolute; bottom: 60px; right: 60px; 
+            display: flex; flex-direction: column; gap: 20px; pointer-events: auto; 
         }
-        .action-btn { 
-            width: 90px; 
-            height: 90px; 
-            border-radius: 50%; 
-            border: 3px solid #fff; 
-            background: rgba(0,0,0,0.6); 
-            color: #fff; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-weight: bold;
-            font-size: 16px;
+        .btn { 
+            width: 100px; height: 100px; border-radius: 50%; 
+            border: 4px solid #fff; background: rgba(0,0,0,0.7); 
+            color: #fff; display: flex; align-items: center; justify-content: center; 
+            font-weight: 900; font-size: 18px; 
         }
-        #fire-trigger { 
-            width: 120px; 
-            height: 120px; 
-            border-color: #ff3333; 
-            color: #ff3333; 
-            font-size: 22px; 
-            background: rgba(50,0,0,0.4);
-        }
+        #fire-btn { width: 130px; height: 130px; border-color: #ff3333; color: #ff3333; font-size: 24px; }
 
-        /* The Aiming Overlay */
-        #aim-catcher { 
-            position: absolute; 
-            top: 0; 
-            right: 0; 
-            width: 60%; 
-            height: 100%; 
-            pointer-events: auto; 
-            z-index: 1; 
-        }
-
-        #damage-overlay { 
-            position: fixed; 
-            inset: 0; 
-            background: radial-gradient(circle, transparent 50%, rgba(255,0,0,0.5) 100%); 
-            pointer-events: none; 
-            opacity: 0; 
-            z-index: 100;
-        }
+        #aim-catcher { position: absolute; top: 0; right: 0; width: 65%; height: 100%; pointer-events: auto; z-index: 1; }
     </style>
 </head>
 <body>
-    <div id="damage-overlay"></div>
     <div id="ui-layer">
         <div id="aim-catcher"></div>
         <div id="minimap"><div id="p-dot" class="dot" style="left:70px; top:70px;"></div></div>
         
-        <div id="stat-card">
-            <div class="stat-label">ENEMIES ALIVE</div>
-            <div id="enemy-count" class="stat-value">0</div>
-            <div style="height: 10px;"></div>
-            <div class="stat-label">ELIMINATIONS</div>
-            <div id="kill-count" class="stat-value">0</div>
+        <div id="leaderboard">
+            <div class="label">ELIMINATIONS</div>
+            <div id="kill-count" class="val">0</div>
+            <div style="height:8px"></div>
+            <div class="label">PING</div>
+            <div id="ping-val" class="val">--</div>
         </div>
 
-        <div id="health-section">
-            <div class="h-tag">SYSTEM INTEGRITY</div>
-            <div id="h-frame"><div id="h-bar"></div></div>
+        <div id="hp-box">
+            <div class="label" style="margin-bottom:5px; color:#ffaa00">HEALTH</div>
+            <div id="hp-bar-bg"><div id="hp-bar-fill"></div></div>
         </div>
 
         <div id="joy-base"><div id="joy-knob"></div></div>
-        
-        <div id="btn-group">
-            <div id="fire-trigger" class="action-btn">FIRE</div>
-            <div id="jump-trigger" class="action-btn">JUMP</div>
+        <div id="action-btns">
+            <div id="fire-btn" class="btn">FIRE</div>
+            <div id="jump-btn" class="btn">JUMP</div>
         </div>
     </div>
-
     <canvas id="game-canvas"></canvas>
 
     <script>
         /**
-         * PRO ENGINE V5 - TEMU FORTNITE
-         * Architecture: Modular Object-Oriented System
-         * Line Target: 600+
+         * TEMU FORTNITE ONLINE - FULL FORCE v10
+         * REPL/RENDER MULTIPLAYER SYNC
          */
 
-        // --- GLOBAL CONFIG & CONSTANTS ---
+        // 1. CONNECT TO YOUR RENDER SERVER
+        // REPLACE THIS URL WITH YOUR ACTUAL RENDER LINK!
+        const SERVER_URL = "https://temu-fortnight.onrender.com"; 
+        const socket = io(SERVER_URL);
+
         const CONFIG = {
-            PLAYER: {
-                SPEED: 18,
-                JUMP_FORCE: 6,
-                HP: 100
-            },
-            AI: {
-                SPAWN_INTERVAL: 5000,
-                MOVE_SPEED: 7,
-                SHOT_INTERVAL: 2800,
-                PERSONAL_SPACE: 1.8 // THE FIX: Keep them away to prevent 90-degree flip
-            },
-            WORLD: {
-                SIZE: 800,
-                TREE_COUNT: 45,
-                GRASS_DENSITY: 300
-            },
-            FX: {
-                BULLET_SPEED: 2.2,
-                BULLET_LIFE: 120
-            }
+            WORLD_SIZE: 1200,
+            PLAYER_HP: 100,
+            COLORS: { PLAYER: 0x0000ff, ENEMY: 0xff0000, SKIN: 0xffdbac }
         };
 
-        // --- UTILITY CLASS ---
-        class Utils {
-            static rand(min, max) { return Math.random() * (max - min) + min; }
-            static clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
-        }
+        // --- GLOBAL STATE ---
+        let myId = null;
+        let remotePlayers = {};
+        let bullets = [];
+        let enemies = [];
 
-        // --- INPUT MANAGER ---
-        class InputManager {
-            constructor() {
-                this.joy = { x: 0, y: 0 };
-                this.aim = { id: null, lastX: 0, deltaX: 0 };
-                this.lastTap = 0;
-                this.setupListeners();
-            }
+        // --- ENGINE SETUP ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1500);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game-canvas'), antialias: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-            setupListeners() {
-                const joyBase = document.getElementById('joy-base');
-                const joyKnob = document.getElementById('joy-knob');
-                const aimZone = document.getElementById('aim-catcher');
-
-                // 1. JOYSTICK HANDLING
-                joyBase.addEventListener('touchstart', (e) => this.handleJoy(e, true));
-                joyBase.addEventListener('touchmove', (e) => this.handleJoy(e, true));
-                joyBase.addEventListener('touchend', () => {
-                    this.joy = { x: 0, y: 0 };
-                    joyKnob.style.transform = `translate(0,0)`;
-                });
-
-                // 2. AIMING (Explicit ID Tracking)
-                aimZone.addEventListener('touchstart', (e) => {
-                    const t = e.changedTouches[0];
-                    if (this.aim.id === null) {
-                        this.aim.id = t.identifier;
-                        this.aim.lastX = t.clientX;
-                    }
-                });
-
-                aimZone.addEventListener('touchmove', (e) => {
-                    for (let t of e.changedTouches) {
-                        if (t.identifier === this.aim.id) {
-                            this.aim.deltaX = t.clientX - this.aim.lastX;
-                            this.aim.lastX = t.clientX;
-                        }
-                    }
-                });
-
-                aimZone.addEventListener('touchend', (e) => {
-                    for (let t of e.changedTouches) {
-                        if (t.identifier === this.aim.id) this.aim.id = null;
-                    }
-                });
-
-                // 3. SAFARI ZOOM KILLER
-                document.addEventListener('touchend', (e) => {
-                    const now = Date.now();
-                    if (now - this.lastTap <= 300) e.preventDefault();
-                    this.lastTap = now;
-                }, { passive: false });
-            }
-
-            handleJoy(e, isTouch) {
-                const r = document.getElementById('joy-base').getBoundingClientRect();
-                const t = isTouch ? e.touches[0] : e;
-                const centerX = r.left + r.width / 2;
-                const centerY = r.top + r.height / 2;
-                
-                let dx = (t.clientX - centerX) / 75;
-                let dy = (t.clientY - centerY) / 75;
-                
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist > 1) { dx /= dist; dy /= dist; }
-                
-                this.joy.x = dx;
-                this.joy.y = dy;
-                document.getElementById('joy-knob').style.transform = `translate(${dx * 50}px, ${dy * 50}px)`;
-            }
-        }
-
-        // --- PARTICLE SYSTEM ---
-        class FXSystem {
-            constructor(scene) {
-                this.scene = scene;
-                this.particles = [];
-            }
-
-            burst(pos, color = 0x00ffff) {
-                const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-                const mat = new THREE.MeshBasicMaterial({ color });
-                for (let i = 0; i < 8; i++) {
-                    const p = new THREE.Mesh(geo, mat);
-                    p.position.copy(pos);
-                    const vel = new THREE.Vector3(Utils.rand(-1,1), Utils.rand(0,2), Utils.rand(-1,1)).multiplyScalar(0.2);
-                    this.particles.push({ m: p, v: vel, life: 30 });
-                    this.scene.add(p);
-                }
-            }
-
-            update() {
-                for (let i = this.particles.length - 1; i >= 0; i--) {
-                    const p = this.particles[i];
-                    p.m.position.add(p.v);
-                    p.m.scale.multiplyScalar(0.95);
-                    if (--p.life <= 0) {
-                        this.scene.remove(p.m);
-                        this.particles.splice(i, 1);
-                    }
-                }
-            }
-        }
-
-        // --- ASSET FACTORY (Textures & Shaders) ---
-        class AssetFactory {
-            static createMinecraftGrass() {
-                const canvas = document.createElement('canvas');
-                canvas.width = 32; canvas.height = 32;
-                const ctx = canvas.getContext('2d');
-                
-                // Blocky shades
-                ctx.fillStyle = '#5d994d'; ctx.fillRect(0,0,32,32);
-                ctx.fillStyle = '#4d8a3d'; ctx.fillRect(0,0,8,8); ctx.fillRect(16,16,8,8);
-                ctx.fillStyle = '#6ea35e'; ctx.fillRect(8,0,8,8); ctx.fillRect(24,24,8,8);
-                
-                const tex = new THREE.CanvasTexture(canvas);
-                tex.magFilter = THREE.NearestFilter;
-                tex.minFilter = THREE.NearestFilter;
-                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-                tex.repeat.set(100, 100);
-                return tex;
-            }
-
-            static createTree() {
+        // --- ASSET FACTORY ---
+        class AssetMaker {
+            static createCharacter(color) {
                 const group = new THREE.Group();
-                const trunk = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3, 0.8), new THREE.MeshStandardMaterial({ color: 0x4a2e19 }));
-                trunk.position.y = 1.5;
-                const leaves = new THREE.Mesh(new THREE.ConeGeometry(2.5, 6, 4), new THREE.MeshStandardMaterial({ color: 0x2d4d1f }));
-                leaves.position.y = 5.5;
-                group.add(trunk, leaves);
+                const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 0.6), new THREE.MeshStandardMaterial({color}));
+                body.position.y = 0.9;
+                const head = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.75, 0.75), new THREE.MeshStandardMaterial({color: CONFIG.COLORS.SKIN}));
+                head.position.y = 2.15;
+                group.add(body, head);
                 return group;
             }
-        }
-
-        // --- MAIN ENGINE CLASS ---
-        class Engine {
-            constructor() {
-                this.canvas = document.getElementById('game-canvas');
-                this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x87ceeb);
-                
-                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-                this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false });
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-                this.input = new InputManager();
-                this.fx = new FXSystem(this.scene);
-                
-                this.player = null;
-                this.enemies = [];
-                this.bullets = [];
-                this.hp = CONFIG.PLAYER.HP;
-                this.kills = 0;
-                this.camAngle = 0;
-                this.spawnTimer = 0;
-
-                this.init();
-            }
-
-            init() {
-                // LIGHTING
-                this.scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-                const sun = new THREE.DirectionalLight(0xffffff, 0.6);
-                sun.position.set(50, 100, 50);
-                this.scene.add(sun);
-
-                // WORLD GEN
-                const floorGeo = new THREE.PlaneGeometry(CONFIG.WORLD.SIZE, CONFIG.WORLD.SIZE);
-                const floorMat = new THREE.MeshStandardMaterial({ map: AssetFactory.createMinecraftGrass() });
-                const floor = new THREE.Mesh(floorGeo, floorMat);
-                floor.rotation.x = -Math.PI / 2;
-                this.scene.add(floor);
-
-                for (let i = 0; i < CONFIG.WORLD.TREE_COUNT; i++) {
-                    const tree = AssetFactory.createTree();
-                    tree.position.set(Utils.rand(-300, 300), 0, Utils.rand(-300, 300));
-                    tree.rotation.y = Math.random() * Math.PI;
-                    this.scene.add(tree);
-                }
-
-                // PLAYER GEN
-                this.player = new THREE.Group();
-                const pBody = new THREE.Mesh(new THREE.BoxGeometry(1, 1.8, 0.6), new THREE.MeshStandardMaterial({ color: 0x0000ff }));
-                pBody.position.y = 1.8;
-                this.pArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 1.3), new THREE.MeshStandardMaterial({ color: 0x222 }));
-                this.pArm.position.set(0.7, 1.6, -0.4);
-                this.player.add(pBody, this.pArm);
-                this.scene.add(this.player);
-
-                // UI EVENTS
-                document.getElementById('fire-trigger').addEventListener('touchstart', () => this.fire(true));
-                document.getElementById('jump-trigger').addEventListener('touchstart', () => this.jump());
-
-                this.animate();
-            }
-
-            jump() {
-                if (this.player.position.y < 0.1) {
-                    gsap.to(this.player.position, { 
-                        y: CONFIG.PLAYER.JUMP_FORCE, 
-                        duration: 0.4, 
-                        yoyo: true, 
-                        repeat: 1, 
-                        ease: "power2.out" 
-                    });
-                }
-            }
-
-            fire(isPlayer, origin = null, dir = null) {
-                const bMesh = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.2, 4, 4), 
-                    new THREE.MeshBasicMaterial({ color: isPlayer ? 0x00ffff : 0xff3333 })
-                );
-                
-                const startPos = origin || this.player.position.clone().add(new THREE.Vector3(0, 1.6, 0));
-                bMesh.position.copy(startPos);
-                
-                const bulletDir = dir || new THREE.Vector3(Math.sin(this.camAngle), 0, Math.cos(this.camAngle));
-                this.bullets.push({
-                    mesh: bMesh,
-                    vel: bulletDir.clone().multiplyScalar(CONFIG.FX.BULLET_SPEED),
-                    life: CONFIG.FX.BULLET_LIFE,
-                    isPlayer: isPlayer
-                });
-                
-                this.scene.add(bMesh);
-                if (isPlayer) {
-                    gsap.fromTo(this.pArm.rotation, { x: 0 }, { x: -0.6, duration: 0.1, yoyo: true, repeat: 1 });
-                }
-            }
-
-            spawnEnemy() {
-                for (let i = 0; i < 2; i++) {
-                    const eGroup = new THREE.Group();
-                    const eBody = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({ color: 0xff0000 }));
-                    eBody.position.y = 1.6;
-                    eGroup.add(eBody);
-
-                    const ang = Math.random() * Math.PI * 2;
-                    eGroup.position.set(
-                        this.player.position.x + Math.cos(ang) * 65, 
-                        0, 
-                        this.player.position.z + Math.sin(ang) * 65
-                    );
-
-                    const dot = document.createElement('div');
-                    dot.className = 'dot';
-                    dot.style.background = '#ff0000';
-                    document.getElementById('minimap').appendChild(dot);
-
-                    this.scene.add(eGroup);
-                    this.enemies.push({ mesh: eGroup, dot, lastShot: Date.now() });
-                }
-                document.getElementById('enemy-count').innerText = this.enemies.length;
-            }
-
-            handleDamage() {
-                this.hp -= 10;
-                document.getElementById('h-bar').style.width = this.hp + "%";
-                gsap.to(document.getElementById('damage-overlay'), { opacity: 1, duration: 0.05, yoyo: true, repeat: 1 });
-                
-                if (this.hp <= 0) location.reload();
-            }
-
-            animate() {
-                requestAnimationFrame(() => this.animate());
-                const now = Date.now();
-
-                // SPAWNER
-                if (now - this.spawnTimer > CONFIG.AI.SPAWN_INTERVAL) {
-                    this.spawnEnemy();
-                    this.spawnTimer = now;
-                }
-
-                // CAMERA & ROTATION
-                this.camAngle -= this.input.aim.deltaX * 0.007;
-                this.input.aim.deltaX = 0; // Reset delta
-                this.player.rotation.y = this.camAngle + Math.PI;
-
-                // MOVEMENT
-                const speed = CONFIG.PLAYER.SPEED * 0.016;
-                const fwd = new THREE.Vector3(Math.sin(this.camAngle), 0, Math.cos(this.camAngle));
-                const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), fwd);
-                
-                this.player.position.x += (fwd.x * -this.input.joy.y * speed) + (side.x * -this.input.joy.x * speed);
-                this.player.position.z += (fwd.z * -this.input.joy.y * speed) + (side.z * -this.input.joy.x * speed);
-
-                // AI SYSTEM
-                this.enemies.forEach((en) => {
-                    const dist = en.mesh.position.distanceTo(this.player.position);
-                    const dir = new THREE.Vector3().subVectors(this.player.position, en.mesh.position).normalize();
-                    
-                    // THE CRITICAL FIX: Only look and move if outside personal space
-                    if (dist > CONFIG.AI.PERSONAL_SPACE) {
-                        en.mesh.lookAt(this.player.position.x, 0, this.player.position.z);
-                        en.mesh.rotateY(Math.PI);
-                        en.mesh.position.add(dir.clone().multiplyScalar(CONFIG.AI.MOVE_SPEED * 0.016));
-                    }
-
-                    if (now - en.lastShot > CONFIG.AI.SHOT_INTERVAL) {
-                        this.fire(false, en.mesh.position.clone().add(new THREE.Vector3(0, 1.4, 0)), dir);
-                        en.lastShot = now;
-                    }
-
-                    // Minimap Tracking
-                    const mx = (en.mesh.position.x - this.player.position.x) * 0.6 + 70;
-                    const mz = (en.mesh.position.z - this.player.position.z) * 0.6 + 70;
-                    en.dot.style.left = mx + 'px';
-                    en.dot.style.top = mz + 'px';
-                    en.dot.style.display = (mx<0 || mx>140 || mz<0 || mz>140) ? 'none' : 'block';
-                });
-
-                // BULLET PHYSICS
-                for (let i = this.bullets.length - 1; i >= 0; i--) {
-                    const b = this.bullets[i];
-                    b.mesh.position.add(b.vel);
-                    if (--b.life <= 0) {
-                        this.scene.remove(b.mesh);
-                        this.bullets.splice(i, 1);
-                        continue;
-                    }
-
-                    if (b.isPlayer) {
-                        this.enemies.forEach((en, eIdx) => {
-                            if (b.mesh.position.distanceTo(en.mesh.position) < 2) {
-                                this.fx.burst(en.mesh.position.clone(), 0xff0000);
-                                this.scene.remove(en.mesh);
-                                en.dot.remove();
-                                this.enemies.splice(eIdx, 1);
-                                this.scene.remove(b.mesh);
-                                this.bullets.splice(i, 1);
-                                this.kills++;
-                                document.getElementById('kill-count').innerText = this.kills;
-                                document.getElementById('enemy-count').innerText = this.enemies.length;
-                            }
-                        });
-                    } else if (b.mesh.position.distanceTo(this.player.position) < 1.6) {
-                        this.handleDamage();
-                        this.scene.remove(b.mesh);
-                        this.bullets.splice(i, 1);
-                    }
-                }
-
-                this.fx.update();
-
-                // CAMERA FOLLOW
-                const camDist = 18;
-                this.camera.position.set(
-                    this.player.position.x - Math.sin(this.camAngle) * camDist,
-                    10,
-                    this.player.position.z - Math.cos(this.camAngle) * camDist
-                );
-                this.camera.lookAt(this.player.position.x, 2.5, this.player.position.z);
-
-                this.renderer.render(this.scene, this.camera);
+            static createTree() {
+                const g = new THREE.Group();
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 3), new THREE.MeshStandardMaterial({color: 0x4a2e19}));
+                trunk.position.y = 1.5;
+                const leaves = new THREE.Mesh(new THREE.ConeGeometry(2.5, 6, 6), new THREE.MeshStandardMaterial({color: 0x2d4d1f}));
+                leaves.position.y = 5;
+                g.add(trunk, leaves);
+                return g;
             }
         }
 
-        // --- START ENGINE ---
-        window.onload = () => {
-            const engine = new Engine();
-            
-            // Resize handling
-            window.addEventListener('resize', () => {
-                engine.camera.aspect = window.innerWidth / window.innerHeight;
-                engine.camera.updateProjectionMatrix();
-                engine.renderer.setSize(window.innerWidth, window.innerHeight);
+        // --- WORLD GEN ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const sun = new THREE.DirectionalLight(0xffffff, 0.4);
+        sun.position.set(10, 50, 10);
+        scene.add(sun);
+
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.MeshStandardMaterial({color: 0x5d994d}));
+        floor.rotation.x = -Math.PI/2;
+        scene.add(floor);
+
+        for(let i=0; i<50; i++) {
+            const tree = AssetMaker.createTree();
+            tree.position.set((Math.random()-0.5)*800, 0, (Math.random()-0.5)*800);
+            scene.add(tree);
+        }
+
+        // --- PLAYER & INPUTS ---
+        const player = AssetMaker.createCharacter(CONFIG.COLORS.PLAYER);
+        const gun = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 1.2), new THREE.MeshStandardMaterial({color: 0x222}));
+        gun.position.set(0.6, 1.4, -0.4);
+        player.add(gun);
+        scene.add(player);
+
+        let move = { x: 0, y: 0 };
+        let aim = { dx: 0, id: null, lastX: 0 };
+        let camRot = 0;
+        let lastTap = 0;
+
+        // --- MULTIPLAYER LISTENERS ---
+        socket.on('connect', () => { myId = socket.id; console.log("Connected!"); });
+        
+        socket.on('state', (serverPlayers) => {
+            Object.keys(serverPlayers).forEach(id => {
+                if(id === myId) return;
+                if(!remotePlayers[id]) {
+                    remotePlayers[id] = AssetMaker.createCharacter(0xffffff); // Remote players are white
+                    scene.add(remotePlayers[id]);
+                }
+                const p = serverPlayers[id];
+                remotePlayers[id].position.set(p.x, p.y, p.z);
+                remotePlayers[id].rotation.y = p.r + Math.PI;
             });
+        });
+
+        socket.on('playerLeave', id => {
+            if(remotePlayers[id]) { scene.remove(remotePlayers[id]); delete remotePlayers[id]; }
+        });
+
+        // --- INPUT BINDINGS (SAFARI PROTECTED) ---
+        const joyBase = document.getElementById('joy-base');
+        const joyKnob = document.getElementById('joy-knob');
+        const aimCatcher = document.getElementById('aim-catcher');
+
+        const handleJoy = (e) => {
+            const r = joyBase.getBoundingClientRect();
+            const t = e.touches[0];
+            let dx = (t.clientX - (r.left + r.width/2)) / 75;
+            let dy = (t.clientY - (r.top + r.height/2)) / 75;
+            const d = Math.sqrt(dx*dx+dy*dy);
+            if(d > 1) { dx/=d; dy/=d; }
+            move = { x: dx, y: dy };
+            joyKnob.style.transform = `translate(${dx*50}px, ${dy*50}px)`;
         };
+
+        joyBase.addEventListener('touchstart', handleJoy);
+        joyBase.addEventListener('touchmove', handleJoy);
+        joyBase.addEventListener('touchend', () => { move={x:0,y:0}; joyKnob.style.transform=`translate(0,0)`; });
+
+        aimCatcher.addEventListener('touchstart', e => {
+            const t = e.changedTouches[0];
+            if(!aim.id) { aim.id = t.identifier; aim.lastX = t.clientX; }
+        });
+        aimCatcher.addEventListener('touchmove', e => {
+            for(let t of e.changedTouches) {
+                if(t.identifier === aim.id) {
+                    aim.dx = t.clientX - aim.lastX;
+                    aim.lastX = t.clientX;
+                }
+            }
+        });
+        aimCatcher.addEventListener('touchend', e => {
+            for(let t of e.changedTouches) if(t.identifier === aim.id) aim.id = null;
+        });
+
+        document.addEventListener('touchend', e => {
+            const now = Date.now();
+            if(now - lastTap < 300) e.preventDefault();
+            lastTap = now;
+        }, {passive: false});
+
+        // --- GAME LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 1. Rotation & Movement
+            camRot -= aim.dx * 0.008; aim.dx = 0;
+            player.rotation.y = camRot + Math.PI;
+
+            const fwd = new THREE.Vector3(Math.sin(camRot), 0, Math.cos(camRot));
+            const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), fwd);
+            player.position.x += (fwd.x * -move.y * 0.35) + (side.x * -move.x * 0.35);
+            player.position.z += (fwd.z * -move.y * 0.35) + (side.z * -move.x * 0.35);
+
+            // 2. Camera Rig
+            camera.position.set(player.position.x - Math.sin(camRot)*18, 11, player.position.z - Math.cos(camRot)*18);
+            camera.lookAt(player.position.x, 2, player.position.z);
+
+            // 3. Network Sync
+            if(socket.connected) {
+                socket.emit('move', { x: player.position.x, y: player.position.y, z: player.position.z, r: camRot });
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
     </script>
 </body>
 </html>
