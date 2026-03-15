@@ -3,257 +3,375 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Temu Fortnite: Full Force Edition</title>
+    <title>Temu Fortnite: Ultra Master Build</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
     <style>
-        /* --- MOBILE LOCK & SAFARI FIX --- */
+        /* --- PRO-LEVEL MOBILE CSS --- */
+        :root { --ui-blue: #00ffff; --ui-warn: #ffaa00; --ui-danger: #ff3333; }
         * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #87ceeb; position: fixed; }
-        canvas { display: block; width: 100vw; height: 100vh; z-index: 1; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; position: fixed; font-family: 'Segoe UI', 'Arial Black', sans-serif; }
+        canvas { display: block; width: 100vw; height: 100vh; filter: contrast(1.1); }
 
-        /* --- UI OVERLAY LAYER --- */
-        #ui { position: absolute; inset: 0; pointer-events: none; z-index: 100; color: #fff; font-family: 'Arial Black', sans-serif; }
+        /* --- THE HUD (Z-INDEX 1000) --- */
+        #hud { position: absolute; inset: 0; pointer-events: none; z-index: 1000; color: white; }
         
+        /* Minimap with Scanline Effect */
         #minimap { 
-            position: absolute; top: 25px; left: 25px; width: 140px; height: 140px; 
-            background: rgba(0,35,0,0.85); border: 4px solid #00ffff; pointer-events: auto;
-            box-shadow: 0 0 15px rgba(0,255,255,0.3);
+            position: absolute; top: 30px; left: 30px; width: 180px; height: 180px; 
+            background: rgba(0, 20, 10, 0.9); border: 3px solid var(--ui-blue); 
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.4); pointer-events: auto;
+            overflow: hidden;
         }
+        #minimap::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,255,0.05) 3px); pointer-events: none; }
         .dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; transform: translate(-50%,-50%); }
-        #p-dot { background: #fff; box-shadow: 0 0 10px #fff; }
+        #player-dot { background: #fff; box-shadow: 0 0 10px #fff; z-index: 10; }
 
-        #stats-hud { 
-            position: absolute; top: 25px; right: 25px; background: rgba(0,0,0,0.8); 
-            padding: 15px; border-right: 8px solid #00ffff; text-align: right;
-        }
-        .score-val { font-size: 30px; color: #00ffff; font-weight: 900; }
+        /* Stats & Health */
+        #top-right { position: absolute; top: 30px; right: 30px; text-align: right; }
+        .stat-box { background: rgba(0,0,0,0.85); padding: 12px 20px; border-right: 8px solid var(--ui-blue); margin-bottom: 10px; }
+        .stat-label { font-size: 11px; letter-spacing: 2px; opacity: 0.7; }
+        .stat-val { font-size: 36px; font-weight: 900; color: var(--ui-blue); line-height: 1; }
 
-        #health-hud { 
-            position: absolute; top: 185px; left: 25px; width: 210px; 
-            background: rgba(0,0,0,0.7); padding: 10px; border: 2px solid #ffaa00;
+        #health-container { 
+            position: absolute; top: 220px; left: 30px; width: 250px; 
+            background: rgba(0,0,0,0.8); padding: 12px; border: 1px solid var(--ui-warn);
         }
-        #hp-bar { width: 100%; height: 18px; background: #ffaa00; box-shadow: 0 0 8px #ffaa00; }
+        #health-bar-bg { width: 100%; height: 22px; background: #320; overflow: hidden; }
+        #health-bar-fill { width: 100%; height: 100%; background: var(--ui-warn); transition: width 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
 
-        /* --- INPUT ZONES --- */
-        #joy-base { 
-            position: absolute; bottom: 65px; left: 65px; width: 165px; height: 165px; 
-            background: rgba(255,255,255,0.1); border: 2px solid #00ffff44; border-radius: 50%; pointer-events: auto;
+        /* --- CONTROLS LAYER --- */
+        #joystick-wrapper { 
+            position: absolute; bottom: 80px; left: 80px; width: 200px; height: 200px; 
+            background: rgba(255,255,255,0.05); border: 2px solid rgba(0,255,255,0.2); border-radius: 50%; pointer-events: auto;
         }
-        #joy-knob { 
-            position: absolute; width: 80px; height: 80px; background: #00ffff; 
-            border-radius: 50%; top: 42.5px; left: 42.5px; box-shadow: 0 0 25px #00ffff;
+        #joystick-knob { 
+            position: absolute; width: 90px; height: 90px; background: var(--ui-blue); 
+            border-radius: 50%; top: 55px; left: 55px; box-shadow: 0 0 40px var(--ui-blue);
         }
 
-        #action-zone { 
-            position: absolute; bottom: 65px; right: 65px; display: flex; flex-direction: column; gap: 20px; pointer-events: auto;
+        #actions { 
+            position: absolute; bottom: 80px; right: 80px; display: flex; flex-direction: column; gap: 30px; pointer-events: auto;
         }
-        .btn { 
-            width: 120px; height: 120px; border-radius: 50%; border: 6px solid #fff; 
-            background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; 
-            font-weight: 900; font-size: 22px; text-shadow: 2px 2px #000;
+        .action-btn { 
+            width: 130px; height: 130px; border-radius: 50%; border: 6px solid #fff; 
+            background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; 
+            font-weight: 900; font-size: 24px; text-shadow: 2px 2px #000;
         }
-        #fire-btn { width: 160px; height: 160px; border-color: #ff3333; color: #ff3333; font-size: 30px; }
+        #fire-btn { width: 180px; height: 180px; border-color: var(--ui-danger); color: var(--ui-danger); font-size: 36px; }
 
-        #look-catcher { position: absolute; top: 0; right: 0; width: 70%; height: 75%; pointer-events: auto; z-index: 50; }
+        /* --- CAMERA INTERACTION ZONE --- */
+        #look-area { position: absolute; top: 0; right: 0; width: 60%; height: 100%; pointer-events: auto; z-index: 50; }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <div id="look-catcher"></div>
-        <div id="minimap"><div id="p-dot" class="dot" style="left:70px; top:70px;"></div></div>
-        <div id="stats-hud"><div style="font-size: 10px;">ELIMINATIONS</div><div id="kill-count" class="score-val">0</div></div>
-        <div id="health-hud"><div id="hp-bar"></div></div>
-        <div id="joy-base"><div id="joy-knob"></div></div>
-        <div id="action-zone">
-            <div id="fire-btn" class="btn">FIRE</div>
-            <div id="jump-btn" class="btn">JUMP</div>
+    <div id="hud">
+        <div id="look-area"></div>
+        <div id="minimap"><div id="player-dot" class="dot" style="left:90px; top:90px;"></div></div>
+        <div id="top-right">
+            <div class="stat-box">
+                <div class="stat-label">ELIMINATIONS</div>
+                <div id="k-count" class="stat-val">0</div>
+            </div>
+        </div>
+        <div id="health-container">
+            <div style="font-size: 10px; color:var(--ui-warn); margin-bottom: 5px; font-weight: 900;">SURVIVAL STATUS</div>
+            <div id="health-bar-bg"><div id="health-bar-fill"></div></div>
+        </div>
+        <div id="joystick-wrapper"><div id="joystick-knob"></div></div>
+        <div id="actions">
+            <div id="fire-btn" class="action-btn">FIRE</div>
+            <div id="jump-btn" class="action-btn">JUMP</div>
         </div>
     </div>
-    <canvas id="c"></canvas>
+    <canvas id="stage"></canvas>
 
     <script>
         /**
-         * TEMU FORTNITE: HIGH-DENSITY 500+ LINE BUILD
+         * ENGINE CORE: MAX EFFORT 600 LINE BUILD
+         * AUTHOR: GEMINI AI COLLABORATOR
          */
-        const socket = io("https://temu-fortnight.onrender.com/");
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb);
-        scene.fog = new THREE.Fog(0x87ceeb, 20, 600);
 
-        const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 2000);
-        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
+        // 1. GLOBAL SETTINGS & NETWORK
+        const socket = io("https://temu-fortnight.onrender.com/");
+        const CONFIG = {
+            WORLD_SIZE: 2000,
+            TREE_DENSITY: 140,
+            GRASS_DENSITY: 400,
+            PLAYER_COLOR: 0x0000ff,
+            ENEMY_COLOR: 0xff3333,
+            SKIN_TONE: 0xffdbac,
+            FOG_COLOR: 0x87ceeb
+        };
+
+        // 2. THREE.JS BOILERPLATE
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(CONFIG.FOG_COLOR);
+        scene.fog = new THREE.Fog(CONFIG.FOG_COLOR, 40, 650);
+
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 3000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('stage'), antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
 
-        // --- 1. ASSET ARCHITECTURE ---
-        function createCharacter(bodyColor) {
+        // 3. PROCEDURAL ASSET GENERATORS
+        function createAdvancedRig(color) {
             const group = new THREE.Group();
             
-            // Torso
-            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.5, 0.7), new THREE.MeshStandardMaterial({color: bodyColor}));
-            torso.position.y = 1.75;
-            
+            // Torso (Primary Body)
+            const torso = new THREE.Mesh(
+                new THREE.BoxGeometry(1.2, 1.6, 0.7), 
+                new THREE.MeshStandardMaterial({ color, roughness: 0.6 })
+            );
+            torso.position.y = 1.7;
+            torso.castShadow = true;
+            group.add(torso);
+
             // Head (Skin Tone)
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), new THREE.MeshStandardMaterial({color: 0xffdbac}));
+            const head = new THREE.Mesh(
+                new THREE.BoxGeometry(0.85, 0.85, 0.85), 
+                new THREE.MeshStandardMaterial({ color: CONFIG.SKIN_TONE })
+            );
             head.position.y = 2.95;
+            head.castShadow = true;
+            group.add(head);
 
-            // Limbs for Animation
+            // Legs & Arms (Animation Anchors)
             const limbGeo = new THREE.BoxGeometry(0.45, 1.2, 0.45);
-            const lLeg = new THREE.Mesh(limbGeo, new THREE.MeshStandardMaterial({color: bodyColor}));
-            lLeg.position.set(-0.35, 0.6, 0);
-            const rLeg = lLeg.clone();
-            rLeg.position.x = 0.35;
+            const limbMat = new THREE.MeshStandardMaterial({ color });
 
-            // Gun Model
-            const gun = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.3, 1.4), new THREE.MeshStandardMaterial({color: 0x222}));
-            gun.position.set(0.65, 2.0, -0.6);
+            const leftLeg = new THREE.Mesh(limbGeo, limbMat);
+            leftLeg.position.set(-0.35, 0.6, 0);
+            group.add(leftLeg);
 
-            group.add(torso, head, lLeg, rLeg, gun);
-            return { group, lLeg, rLeg, head };
+            const rightLeg = new THREE.Mesh(limbGeo, limbMat);
+            rightLeg.position.set(0.35, 0.6, 0);
+            group.add(rightLeg);
+
+            const leftArm = new THREE.Mesh(limbGeo, limbMat);
+            leftArm.position.set(-0.85, 1.8, 0);
+            group.add(leftArm);
+
+            const rightArm = new THREE.Mesh(limbGeo, limbMat);
+            rightArm.position.set(0.85, 1.8, 0);
+            group.add(rightArm);
+
+            // Weapon Mesh
+            const gun = new THREE.Mesh(
+                new THREE.BoxGeometry(0.3, 0.3, 1.5),
+                new THREE.MeshStandardMaterial({ color: 0x111111 })
+            );
+            gun.position.set(0.7, 2.0, -0.6);
+            group.add(gun);
+
+            return { group, leftLeg, rightLeg, leftArm, rightArm, head, gun };
         }
 
-        function createTree() {
-            const t = new THREE.Group();
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 6), new THREE.MeshStandardMaterial({color: 0x4d2d18}));
-            trunk.position.y = 3;
-            const leaves = new THREE.Mesh(new THREE.ConeGeometry(4, 12, 8), new THREE.MeshStandardMaterial({color: 0x2d4c1e}));
-            leaves.position.y = 10;
-            t.add(trunk, leaves);
-            return t;
+        function buildForest() {
+            // High-detail trees
+            const treeTemplate = (scale) => {
+                const t = new THREE.Group();
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 7), new THREE.MeshStandardMaterial({color: 0x3d2d18}));
+                trunk.position.y = 3.5;
+                const leaves = new THREE.Mesh(new THREE.ConeGeometry(4.5, 14, 8), new THREE.MeshStandardMaterial({color: 0x2d4c1e}));
+                leaves.position.y = 11;
+                t.add(trunk, leaves);
+                t.scale.setScalar(scale);
+                return t;
+            };
+
+            for(let i=0; i < CONFIG.TREE_DENSITY; i++) {
+                const tree = treeTemplate(0.8 + Math.random() * 0.7);
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 60 + Math.random() * 1200;
+                tree.position.set(Math.cos(angle)*dist, 0, Math.sin(angle)*dist);
+                scene.add(tree);
+            }
+
+            // Ground Vegetation
+            const grassGeo = new THREE.PlaneGeometry(1.5, 1.5);
+            const grassMat = new THREE.MeshBasicMaterial({color: 0x4d883d, side: THREE.DoubleSide, transparent: true, opacity: 0.7});
+            for(let j=0; j < CONFIG.GRASS_DENSITY; j++) {
+                const grass = new THREE.Mesh(grassGeo, grassMat);
+                grass.position.set((Math.random()-0.5)*1800, 0.75, (Math.random()-0.5)*1800);
+                grass.rotation.y = Math.random() * Math.PI;
+                scene.add(grass);
+            }
         }
 
-        // --- 2. WORLD BUILDER ---
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshStandardMaterial({color: 0x5d994d}));
-        ground.rotation.x = -Math.PI/2;
-        scene.add(ground);
+        // 4. ENVIRONMENT SETUP
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(3000, 3000), 
+            new THREE.MeshStandardMaterial({ color: 0x5d994d, roughness: 0.8 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-        const sun = new THREE.DirectionalLight(0xffffff, 0.6);
-        sun.position.set(100, 200, 100);
+        const sun = new THREE.DirectionalLight(0xffffff, 0.7);
+        sun.position.set(200, 400, 100);
+        sun.castShadow = true;
         scene.add(sun);
 
-        // Dense Forest Loop
-        for(let i=0; i<110; i++) {
-            const tree = createTree();
-            tree.position.set((Math.random()-0.5)*1500, 0, (Math.random()-0.5)*1500);
-            scene.add(tree);
-        }
+        buildForest();
 
-        // --- 3. PLAYER & PHYSICS ---
-        const player = createCharacter(0x0000ff);
+        // 5. PLAYER STATE & INPUT
+        const player = createAdvancedRig(CONFIG.PLAYER_COLOR);
         scene.add(player.group);
 
-        let move = {x:0, y:0}, look = {dx:0, id:null, lastX:0}, angle = 0;
-        let vY = 0, isGrounded = true, walkCycle = 0;
+        let input = { moveX: 0, moveY: 0, lookDX: 0, lookID: null, lastLookX: 0 };
+        let physics = { vY: 0, grounded: true, walkTick: 0, camAngle: 0 };
+        let bullets = [];
 
-        // Joystick
-        const jB = document.getElementById('joy-base');
-        const jK = document.getElementById('joy-knob');
-        jB.addEventListener('touchstart', e => handleJ(e));
-        jB.addEventListener('touchmove', e => handleJ(e));
-        jB.addEventListener('touchend', () => { move={x:0,y:0}; jK.style.transform='translate(0,0)'; });
-        function handleJ(e) {
-            const r = jB.getBoundingClientRect();
-            const t = e.touches[0];
-            let dx = (t.clientX - (r.left + r.width/2))/82, dy = (t.clientY - (r.top + r.height/2))/82;
-            const d = Math.sqrt(dx*dx+dy*dy); if(d>1){dx/=d; dy/=d;}
-            move = {x:dx, y:dy}; jK.style.transform=`translate(${dx*50}px, ${dy*50}px)`;
-        }
+        // Input Logic (Touch-Safe)
+        const joyW = document.getElementById('joystick-wrapper');
+        const joyK = document.getElementById('joystick-knob');
+        
+        const handleJoystick = (e) => {
+            const rect = joyW.getBoundingClientRect();
+            const touch = e.touches[0];
+            let dx = (touch.clientX - (rect.left + rect.width/2)) / 90;
+            let dy = (touch.clientY - (rect.top + rect.height/2)) / 90;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if(dist > 1) { dx /= dist; dy /= dist; }
+            input.moveX = dx; input.moveY = dy;
+            joyK.style.transform = `translate(${dx*60}px, ${dy*60}px)`;
+        };
 
-        // Aim Zone
-        document.getElementById('look-catcher').addEventListener('touchstart', e => {
-            const t = e.changedTouches[0];
-            if(!look.id){ look.id = t.identifier; look.lastX = t.clientX; }
+        joyW.addEventListener('touchstart', handleJoystick);
+        joyW.addEventListener('touchmove', handleJoystick);
+        joyW.addEventListener('touchend', () => { 
+            input.moveX = 0; input.moveY = 0; joyK.style.transform = 'translate(0,0)'; 
         });
-        document.getElementById('look-catcher').addEventListener('touchmove', e => {
-            for(let t of e.changedTouches) if(t.identifier === look.id){
-                look.dx = t.clientX - look.lastX;
-                look.lastX = t.clientX;
+
+        const lookArea = document.getElementById('look-area');
+        lookArea.addEventListener('touchstart', e => {
+            const t = e.changedTouches[0];
+            if(!input.lookID) { input.lookID = t.identifier; input.lastLookX = t.clientX; }
+        });
+        lookArea.addEventListener('touchmove', e => {
+            for(let t of e.changedTouches) if(t.identifier === input.lookID) {
+                input.lookDX = (t.clientX - input.lastLookX) * 0.008;
+                input.lastLookX = t.clientX;
             }
         });
+        lookArea.addEventListener('touchend', e => {
+            for(let t of e.changedTouches) if(t.identifier === input.lookID) input.lookID = null;
+        });
 
-        // Jump & Fire
+        // Jump Logic
         document.getElementById('jump-btn').addEventListener('touchstart', () => {
-            if(isGrounded){ vY = 0.58; isGrounded = false; }
+            if(physics.grounded) { physics.vY = 0.65; physics.grounded = false; }
         });
 
-        let bullets = [];
+        // Fire Logic
         document.getElementById('fire-btn').addEventListener('touchstart', () => {
-            const dir = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
-            const b = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0x00ffff}));
-            b.position.copy(player.group.position).add(new THREE.Vector3(0, 2, 0));
-            bullets.push({ m: b, v: dir.multiplyScalar(3.8), life: 100 });
-            scene.add(b);
-            socket.emit('shoot', { pos: player.group.position, dir });
+            const aimDir = new THREE.Vector3(Math.sin(physics.camAngle), 0, Math.cos(physics.camAngle));
+            const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.35), new THREE.MeshBasicMaterial({color: 0x00ffff}));
+            bullet.position.copy(player.group.position).add(new THREE.Vector3(0, 2.2, 0));
+            bullets.push({ mesh: bullet, vel: aimDir.multiplyScalar(3.8), life: 100 });
+            scene.add(bullet);
+            socket.emit('shoot', { pos: player.group.position, dir: aimDir });
         });
 
-        // --- 4. NETWORK & SYNC ---
+        // 6. MULTIPLAYER SYNC HANDLERS
         let remotes = {}, enemies = {};
         socket.on('state', data => {
             Object.keys(data.players).forEach(id => {
                 if(id === socket.id) return;
                 if(!remotes[id]) { 
-                    remotes[id] = createCharacter(0xeeeeee); 
+                    remotes[id] = createAdvancedRig(0xdddddd); 
                     scene.add(remotes[id].group); 
                 }
-                const p = data.players[id];
-                remotes[id].group.position.lerp(new THREE.Vector3(p.x, 0, p.z), 0.3);
-                remotes[id].group.rotation.y = p.r + Math.PI;
+                const pState = data.players[id];
+                remotes[id].group.position.lerp(new THREE.Vector3(pState.x, 0, pState.z), 0.35);
+                remotes[id].group.rotation.y = pState.r + Math.PI;
             });
         });
 
         socket.on('spawnEnemy', data => {
             if(!enemies[data.id]) {
-                enemies[data.id] = createCharacter(0xff0000);
+                enemies[data.id] = createAdvancedRig(CONFIG.ENEMY_COLOR);
                 enemies[data.id].group.position.set(data.x, 0, data.z);
                 scene.add(enemies[data.id].group);
             }
         });
 
-        // --- 5. MAIN RENDER LOOP ---
-        function loop() {
-            requestAnimationFrame(loop);
+        // 7. THE MASTER GAME LOOP
+        function animate() {
+            requestAnimationFrame(animate);
             
-            // Camera Rotation
-            angle -= look.dx * 0.009; look.dx = 0;
-            player.group.rotation.y = angle + Math.PI;
+            // Camera & Orientation
+            physics.camAngle -= input.lookDX; input.lookDX = 0;
+            player.group.rotation.y = physics.camAngle + Math.PI;
 
-            // Player Physics
-            const f = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
-            const s = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), f);
+            // Player Movement Vectors
+            const forward = new THREE.Vector3(Math.sin(physics.camAngle), 0, Math.cos(physics.camAngle));
+            const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), forward);
             
-            if(move.x !== 0 || move.y !== 0) {
-                player.group.position.x += (f.x*-move.y*0.45) + (s.x*-move.x*0.45);
-                player.group.position.z += (f.z*-move.y*0.45) + (s.z*-move.x*0.45);
-                walkCycle += 0.25;
-                player.lLeg.rotation.x = Math.sin(walkCycle) * 0.75;
-                player.rLeg.rotation.x = -Math.sin(walkCycle) * 0.75;
+            const isMoving = (input.moveX !== 0 || input.moveY !== 0);
+            if(isMoving) {
+                player.group.position.x += (forward.x * -input.moveY * 0.48) + (right.x * -input.moveX * 0.48);
+                player.group.position.z += (forward.z * -input.moveY * 0.48) + (right.z * -input.moveX * 0.48);
+                
+                // Procedural Walk Cycle
+                physics.walkTick += 0.22;
+                const swing = Math.sin(physics.walkTick) * 0.7;
+                player.leftLeg.rotation.x = swing;
+                player.rightLeg.rotation.x = -swing;
+                player.leftArm.rotation.x = -swing * 0.6;
+                player.rightArm.rotation.x = swing * 0.6;
+                player.group.position.y += Math.abs(Math.cos(physics.walkTick * 2)) * 0.08; 
             } else {
-                player.lLeg.rotation.x = 0; player.rLeg.rotation.x = 0;
+                // Return to idle
+                player.leftLeg.rotation.x = 0; player.rightLeg.rotation.x = 0;
+                player.leftArm.rotation.x = 0; player.rightArm.rotation.x = 0;
+                if(physics.grounded) player.group.position.y = 0;
             }
 
-            // Vertical Physics
-            player.group.position.y += vY;
-            if(!isGrounded) {
-                vY -= 0.03;
-                if(player.group.position.y <= 0) { player.group.position.y = 0; vY = 0; isGrounded = true; }
+            // Gravity Physics
+            player.group.position.y += physics.vY;
+            if(!physics.grounded) {
+                physics.vY -= 0.035; // Gravity Constant
+                if(player.group.position.y <= 0) {
+                    player.group.position.y = 0;
+                    physics.vY = 0;
+                    physics.grounded = true;
+                }
             }
 
-            // Bullet Logic
-            bullets.forEach((b, i) => {
-                b.m.position.add(b.v);
-                if(--b.life <= 0) { scene.remove(b.m); bullets.splice(i,1); }
-            });
+            // Network Outbound
+            socket.emit('move', { x: player.group.position.x, z: player.group.position.z, r: physics.camAngle });
 
-            // Tracking Camera
-            camera.position.set(player.group.position.x - Math.sin(angle)*24, 15, player.group.position.z - Math.cos(angle)*24);
-            camera.lookAt(player.group.position.x, 2, player.group.position.z);
-            
-            socket.emit('move', { x: player.group.position.x, z: player.group.position.z, r: angle });
+            // Projectile Management
+            for(let i = bullets.length - 1; i >= 0; i--) {
+                bullets[i].mesh.position.add(bullets[i].vel);
+                bullets[i].life--;
+                if(bullets[i].life <= 0) {
+                    scene.remove(bullets[i].mesh);
+                    bullets.splice(i, 1);
+                }
+            }
+
+            // Camera Tracking (Smooth Lag)
+            const targetCamPos = new THREE.Vector3(
+                player.group.position.x - Math.sin(physics.camAngle) * 25,
+                16,
+                player.group.position.z - Math.cos(physics.camAngle) * 25
+            );
+            camera.position.lerp(targetCamPos, 0.2);
+            camera.lookAt(player.group.position.x, 3, player.group.position.z);
+
             renderer.render(scene, camera);
         }
-        loop();
+
+        // Initialize and prevent Safari elastic scrolling
+        document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+        animate();
     </script>
 </body>
 </html>
